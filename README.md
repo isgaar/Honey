@@ -109,7 +109,6 @@ $HOME/.config/fontconfig/conf.d/99-honey.conf
 Si ya existe un archivo con ese nombre y no fue creado por Honey, el comando
 `honey apply` crea un respaldo antes de reemplazarlo.
 
-## Publicar en GitHub
 
 El flujo de publicacion queda integrado en `scripts/publish-github.sh`:
 
