@@ -36,7 +36,8 @@ activar cambios sin un comando explicito.
 
 `bin/honey`
 
-CLI principal. Aplica, retira y diagnostica el perfil tipografico.
+CLI principal. Aplica, retira y diagnostica el perfil tipografico, incluyendo
+compatibilidad GTK/KDE/Electron.
 
 `config/fontconfig/99-honey.conf`
 
@@ -75,7 +76,7 @@ honey apply
 honey status
 ```
 
-6. Si algo no convence, retira el perfil:
+6. Si algo no convence, retira el perfil y restaura configs gestionadas:
 
 ```bash
 honey reset
@@ -130,4 +131,3 @@ Retiro:
 ```bash
 honey reset
 ```
-

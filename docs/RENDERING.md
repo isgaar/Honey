@@ -91,6 +91,33 @@ Puede no afectar:
 - contenido web que define fuentes remotas;
 - render dentro de imagenes, canvas o juegos.
 
+## GTK, KDE y Electron
+
+Algunas aplicaciones no toman todo directamente de `fontconfig`. Por eso Honey
+tambien alinea capas de compatibilidad.
+
+GTK:
+
+- `gtk-xft-antialias=1`
+- `gtk-xft-hinting=1`
+- `gtk-xft-hintstyle=hintslight`
+- `gtk-xft-rgba=none`
+
+KDE:
+
+- `XftAntialias=true`
+- `XftHintStyle=hintslight`
+- `XftSubPixel=none`
+
+Electron/Codium:
+
+- `--font-render-hinting=slight`
+- `--disable-lcd-text`
+- override local de `codium.desktop` en `~/.local/share/applications`.
+
+Estas claves ayudan a que VSCodium, apps Qt/KDE y apps GTK no se queden con un
+perfil distinto al de Honey.
+
 ## Como inspeccionar
 
 Ver la fuente resuelta:
@@ -111,4 +138,3 @@ Ver el estado desde Honey:
 ```bash
 honey status
 ```
-

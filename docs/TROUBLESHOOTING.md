@@ -61,6 +61,41 @@ fc-match monospace
 Despues reabre las aplicaciones. Algunas leen configuracion de fuentes solo al
 arrancar.
 
+## VSCodium se ve igual
+
+VSCodium usa Electron/Chromium y puede obedecer flags propios aunque
+`fontconfig` ya este listo.
+
+Revisa:
+
+```bash
+honey status
+cat "$HOME/.config/codium-flags.conf"
+```
+
+Honey espera ver:
+
+```bash
+--font-render-hinting=slight
+--disable-lcd-text
+```
+
+Tambien revisa que el lanzador local tenga los flags:
+
+```bash
+honey status
+grep '^Exec=' "$HOME/.local/share/applications/codium.desktop"
+```
+
+Cierra todas las ventanas de VSCodium y abre de nuevo la app. Si solo recargas
+la ventana, Electron puede conservar el render anterior.
+
+Para saltarte el menu y probar directo:
+
+```bash
+honey launch-codium .
+```
+
 ## Una aplicacion se ve igual
 
 Puede ocurrir si esa aplicacion:
@@ -104,4 +139,3 @@ ls -la "$HOME/.local/state/honey/backups"
 
 Honey crea respaldos cuando encuentra un `99-honey.conf` previo que no fue
 generado por Honey.
-

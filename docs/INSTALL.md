@@ -72,6 +72,10 @@ Honey escribira:
 $HOME/.config/fontconfig/conf.d/99-honey.conf
 ```
 
+Tambien sincronizara, con respaldos, configuraciones de GTK, KDE, xsettingsd y
+Electron/Codium cuando existan. En KDE crea ademas un override local del
+lanzador de VSCodium para que el icono del menu use los flags de Honey.
+
 Despues regenera la cache si `fc-cache` esta disponible.
 
 ## Verificar instalacion
@@ -88,13 +92,20 @@ Tambien puedes ejecutar el ejemplo:
 ~/.local/share/honey/examples/check-rendering.sh
 ```
 
+Para abrir VSCodium con los flags de Honey sin depender del menu:
+
+```bash
+honey launch-codium .
+```
+
 ## Retirar el perfil
 
 ```bash
 honey reset
 ```
 
-Eso elimina `99-honey.conf` solo si el archivo contiene la marca de Honey.
+Eso elimina `99-honey.conf` solo si el archivo contiene la marca de Honey y
+restaura los originales guardados de GTK/KDE/Electron.
 
 ## Desinstalar todo
 
@@ -127,4 +138,3 @@ Tambien puedes usar ambas variables:
 ```bash
 HONEY_PREFIX="$HOME/.local" HONEY_HOME="$HOME/apps/honey" ./installer.sh install
 ```
-
