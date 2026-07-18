@@ -1,0 +1,20 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+*.tmp
+*.swp
+*~
+
+# Entornos locales
+.env
+.env.*
+!.env.example
+
+# Artefactos del runtime
+dist/
+build/
+.cache/
+

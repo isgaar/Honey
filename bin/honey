@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Honey runtime CLI
+
+set -Eeuo pipefail
+
+VERSION="0.1.0"
+
+usage() {
+    cat <<'EOF'
+Honey runtime
+
+Uso:
+  honey run ARCHIVO.hny      Ejecuta un programa Honey
+  honey new ARCHIVO.hny      Crea un programa base
+  honey doctor               Revisa el entorno local
+  honey version              Muestra la version
+  honey help                 Muestra esta ayuda
+
+Lenguaje actual:
+  print TEXTO                Imprime texto
+  env VARIABLE               Imprime una variable de entorno
+  sleep SEGUNDOS             Pausa la ejecucion
+  exit CODIGO                Termina con un codigo
+EOF
+}
+
+die() {
+    printf 'ERROR %s\n' "$1" >&2
+    exit 1
+}
+
+trim() {
+    local value="$*"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+run_file() {
+    local file="${1:-}"
+    [[ -n "$file" ]] || die "Falta archivo. Uso: honey run ARCHIVO.hny"
+    [[ -f "$file" ]] || die "No existe el archivo: $file"
+
+    local line raw line_number command_text value
+    line_number=0
+
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+        line_number=$((line_number + 1))
+        line="$(trim "$raw")"
+
+        [[ -z "$line" ]] && continue
+        [[ "$line" == \#* ]] && continue
+
+        case "$line" in
+            print\ *)
+                printf '%s\n' "${line#print }"
+                ;;
+            env\ *)
+                value="${line#env }"
+                value="$(trim "$value")"
+                [[ -n "$value" ]] || die "$file:$line_number env necesita un nombre"
+                printf '%s\n' "${!value-}"
+                ;;
+            sleep\ *)
+                value="${line#sleep }"
+                value="$(trim "$value")"
+                [[ "$value" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "$file:$line_number sleep necesita segundos numericos"
+                sleep "$value"
+                ;;
+            exit\ *)
+                value="${line#exit }"
+                value="$(trim "$value")"
+                [[ "$value" =~ ^[0-9]+$ ]] || die "$file:$line_number exit necesita un codigo numerico"
+                exit "$value"
+                ;;
+            *)
+                command_text="${line%% *}"
+                die "$file:$line_number comando desconocido: $command_text"
+                ;;
+        esac
+    done < "$file"
+}
+
+new_file() {
+    local file="${1:-}"
+    [[ -n "$file" ]] || die "Falta archivo. Uso: honey new ARCHIVO.hny"
+    [[ ! -e "$file" ]] || die "Ya existe: $file"
+
+    cat > "$file" <<'EOF'
+# Programa Honey
+print Hola desde Honey
+env USER
+EOF
+
+    printf 'Creado %s\n' "$file"
+}
+
+doctor() {
+    printf 'Honey %s\n' "$VERSION"
+    printf 'bash=%s\n' "${BASH_VERSION:-unknown}"
+    printf 'runtime=%s\n' "$(realpath "$0" 2>/dev/null || printf '%s' "$0")"
+    printf 'pwd=%s\n' "$PWD"
+}
+
+main() {
+    local command_name="${1:-help}"
+    shift || true
+
+    case "$command_name" in
+        run) run_file "${1:-}" ;;
+        new) new_file "${1:-}" ;;
+        doctor) doctor ;;
+        version|-v|--version) printf 'Honey %s\n' "$VERSION" ;;
+        help|-h|--help) usage ;;
+        *)
+            usage
+            die "Comando desconocido: $command_name"
+            ;;
+    esac
+}
+
+main "$@"
+
