@@ -37,7 +37,7 @@ activar cambios sin un comando explicito.
 `bin/honey`
 
 CLI principal. Aplica, retira y diagnostica el perfil tipografico, incluyendo
-compatibilidad GTK/KDE/Electron.
+compatibilidad GTK/KDE/Electron y entorno de sesión KDE/DBus.
 
 `config/fontconfig/99-honey.conf`
 

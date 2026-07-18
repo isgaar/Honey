@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+- Cambia la estrategia principal a una capa de sesión KDE mediante `environment.d` y `plasma-workspace/env`.
+- Importa `HONEY_ACTIVE`, `HONEY_FONTCONFIG` y `FREETYPE_PROPERTIES` en systemd user/DBus cuando es posible.
+- Deja de depender de lanzadores `.desktop` por aplicación como mecanismo principal.
+- Restaura flags y lanzadores locales heredados de pruebas anteriores cuando `honey apply` o `honey reset` encuentran respaldos.
+
+## 0.3.2
+
+- Agrega `codium-honey.desktop` como instancia separada para KDE.
+- Agrega `honey launch-honey-codium` con `user-data-dir` y extensiones aisladas.
+- Expone la ruta del launcher Honey en `honey status`, `doctor` y `paths`.
+
 ## 0.3.1
 
 - Corrige el lanzador de Codium para usar `/usr/bin/codium`, que si reenvia flags a Electron.

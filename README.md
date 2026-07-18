@@ -16,7 +16,7 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 - Define una prioridad razonable de fuentes sans, serif, mono y emoji.
 - Regenera la caché de fuentes cuando `fc-cache` está disponible.
 - Agrega una base para documentar y ampliar instrucciones orientadas a apps GTK y KDE.
-- Sincroniza GTK, KDE y Electron/Codium para que apps como VSCodium no ignoren el perfil.
+- Sincroniza GTK, KDE, DBus y systemd user para que las apps lanzadas por KDE hereden Honey.
 - Mantiene todo bajo `$HOME`, sin `sudo`.
 
 ## Qué incluye
@@ -116,7 +116,8 @@ $HOME/.config/gtk-4.0/settings.ini
 $HOME/.config/xsettingsd/xsettingsd.conf
 $HOME/.config/kdeglobals
 $HOME/.config/codium-flags.conf
-$HOME/.local/share/applications/codium.desktop
+$HOME/.config/environment.d/90-honey.conf
+$HOME/.config/plasma-workspace/env/90-honey.sh
 ```
 
 ## GTK y KDE
@@ -132,16 +133,23 @@ En KDE, Honey alinea `XftAntialias`, `XftHintStyle` y `XftSubPixel` dentro de
 
 ## VSCodium y Electron
 
-VSCodium puede no reflejar Honey si sus flags de Electron fuerzan otro render.
-Honey revisa `codium-flags.conf` y usa `--font-render-hinting=slight` junto con
-`--disable-lcd-text` para mantener el render grayscale del perfil. Después de
-`honey apply`, cierra y abre VSCodium.
+VSCodium puede no reflejar Honey si ya estaba abierto antes de aplicar el
+perfil. Honey no intenta modificar aplicación por aplicación: instala una capa
+de sesión para KDE mediante `environment.d`, `plasma-workspace/env`, DBus y
+systemd user.
 
-En KDE, Honey también crea un override local de `codium.desktop` para que el
-icono de VSCodium arranque con esos flags. Para probar sin depender del menú:
+Después de `honey apply`, los lanzamientos nuevos de KDE deben heredar:
+
+```text
+HONEY_ACTIVE=1
+HONEY_FONTCONFIG=$HOME/.config/fontconfig/conf.d/99-honey.conf
+FREETYPE_PROPERTIES=truetype:interpreter-version=40
+```
+
+Para diagnosticar una app Electron sin depender del menú:
 
 ```bash
-honey launch-codium .
+honey launch-honey-codium .
 ```
 
 ## Documentación

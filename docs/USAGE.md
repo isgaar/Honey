@@ -26,19 +26,41 @@ Este comando:
 - respalda un `99-honey.conf` previo si no fue creado por Honey;
 - copia el perfil de Honey;
 - alinea GTK 3, GTK 4, xsettingsd y KDE;
-- alinea flags de Electron/Codium para VSCodium;
-- crea un override local de `codium.desktop` para KDE;
+- instala una capa de sesión para KDE con `environment.d` y `plasma-workspace/env`;
+- importa el entorno Honey a systemd user y DBus cuando la sesión lo permite;
 - regenera cache con `fc-cache` cuando esta disponible.
 
-## Lanzar VSCodium con Honey
+## Sesión KDE
 
-Si quieres comprobar el render sin usar el lanzador del menu:
+Honey evita modificar aplicación por aplicación. En KDE, la ruta estable es que
+las apps lanzadas desde el menú hereden variables de sesión:
 
-```bash
-honey launch-codium .
+```text
+HONEY_ACTIVE=1
+HONEY_FONTCONFIG=~/.config/fontconfig/conf.d/99-honey.conf
+FREETYPE_PROPERTIES=truetype:interpreter-version=40
 ```
 
-Eso abre Codium pasando los flags de Honey directamente al proceso.
+Honey escribe esas variables en:
+
+```bash
+~/.config/environment.d/90-honey.conf
+~/.config/plasma-workspace/env/90-honey.sh
+```
+
+## Diagnóstico con VSCodium
+
+```bash
+honey launch-honey-codium .
+```
+
+Ese comando abre una instancia aislada para comparar render y confirmar que
+Honey funciona sin depender de una ventana vieja.
+
+```bash
+~/.config/VSCodium-Honey
+~/.local/share/honey/codium/extensions
+```
 
 ## Ver estado
 
@@ -53,7 +75,7 @@ Muestra:
 - donde esta el archivo aplicado;
 - que fuentes resuelve `fontconfig` para familias comunes;
 - que hinting estan usando GTK, KDE y Codium.
-- si el lanzador local de Codium ya incluye los flags de Honey.
+- si `environment.d` y el hook de Plasma estan activos.
 
 ## Retirar el perfil
 

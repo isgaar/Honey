@@ -109,11 +109,13 @@ KDE:
 - `XftHintStyle=hintslight`
 - `XftSubPixel=none`
 
-Electron/Codium:
+Sesión KDE:
 
-- `--font-render-hinting=slight`
-- `--disable-lcd-text`
-- override local de `codium.desktop` en `~/.local/share/applications`.
+- `~/.config/environment.d/90-honey.conf`
+- `~/.config/plasma-workspace/env/90-honey.sh`
+- `HONEY_ACTIVE=1`
+- `HONEY_FONTCONFIG=.../99-honey.conf`
+- `FREETYPE_PROPERTIES=truetype:interpreter-version=40`
 
 Estas claves ayudan a que VSCodium, apps Qt/KDE y apps GTK no se queden con un
 perfil distinto al de Honey.

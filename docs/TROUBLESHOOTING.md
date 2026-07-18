@@ -61,40 +61,45 @@ fc-match monospace
 Despues reabre las aplicaciones. Algunas leen configuracion de fuentes solo al
 arrancar.
 
+## Una app lanzada por KDE se ve igual
+
+Primero revisa que la capa de sesión exista:
+
+```bash
+honey status
+cat "$HOME/.config/environment.d/90-honey.conf"
+cat "$HOME/.config/plasma-workspace/env/90-honey.sh"
+```
+
+Si `honey apply` no pudo importar el entorno a DBus/systemd user en la sesión
+actual, cierra sesión y vuelve a entrar. No debería hacer falta reiniciar todo
+el sistema.
+
 ## VSCodium se ve igual
 
-VSCodium usa Electron/Chromium y puede obedecer flags propios aunque
-`fontconfig` ya este listo.
-
-Revisa:
+VSCodium usa Electron/Chromium y puede conservar procesos viejos aunque cierres
+una ventana. Revisa:
 
 ```bash
 honey status
-cat "$HOME/.config/codium-flags.conf"
 ```
 
-Honey espera ver:
+Honey espera ver la capa de sesión activa:
+
+```text
+KDE environment.d -> active
+Plasma env hook -> active
+```
+
+Para evitar que Codium reutilice una ventana vieja, prueba una instancia
+aislada de diagnóstico:
 
 ```bash
---font-render-hinting=slight
---disable-lcd-text
+honey launch-honey-codium .
 ```
 
-Tambien revisa que el lanzador local tenga los flags:
-
-```bash
-honey status
-grep '^Exec=' "$HOME/.local/share/applications/codium.desktop"
-```
-
-Cierra todas las ventanas de VSCodium y abre de nuevo la app. Si solo recargas
-la ventana, Electron puede conservar el render anterior.
-
-Para saltarte el menu y probar directo:
-
-```bash
-honey launch-codium .
-```
+Cierra todas las ventanas de VSCodium antes de comparar. Si solo recargas la
+ventana, Electron puede conservar el render anterior.
 
 ## Una aplicacion se ve igual
 

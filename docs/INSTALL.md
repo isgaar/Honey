@@ -73,8 +73,8 @@ $HOME/.config/fontconfig/conf.d/99-honey.conf
 ```
 
 Tambien sincronizara, con respaldos, configuraciones de GTK, KDE, xsettingsd y
-Electron/Codium cuando existan. En KDE crea ademas un override local del
-lanzador de VSCodium para que el icono del menu use los flags de Honey.
+Electron/Codium cuando existan. En KDE instala una capa de sesión para que el
+menú y otros lanzadores hereden Honey sin modificar aplicación por aplicación.
 
 Despues regenera la cache si `fc-cache` esta disponible.
 
@@ -92,10 +92,10 @@ Tambien puedes ejecutar el ejemplo:
 ~/.local/share/honey/examples/check-rendering.sh
 ```
 
-Para abrir VSCodium con los flags de Honey sin depender del menu:
+Para abrir una instancia aislada de diagnóstico:
 
 ```bash
-honey launch-codium .
+honey launch-honey-codium .
 ```
 
 ## Retirar el perfil

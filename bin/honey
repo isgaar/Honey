@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.3.1"
+VERSION="0.4.0"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -23,6 +23,12 @@ MARKER="Managed by Honey"
 
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+ENVIRONMENT_DIR="$CONFIG_HOME/environment.d"
+PLASMA_ENV_DIR="$CONFIG_HOME/plasma-workspace/env"
+HONEY_ENVIRONMENT_TARGET="$ENVIRONMENT_DIR/90-honey.conf"
+HONEY_PLASMA_ENV_TARGET="$PLASMA_ENV_DIR/90-honey.sh"
+HONEY_ACTIVE_VALUE="1"
+HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40"
 GTK3_SETTINGS="$CONFIG_HOME/gtk-3.0/settings.ini"
 GTK4_SETTINGS="$CONFIG_HOME/gtk-4.0/settings.ini"
 XSETTINGSD_CONFIG="$CONFIG_HOME/xsettingsd/xsettingsd.conf"
@@ -38,6 +44,9 @@ CODIUM_DESKTOP_SOURCE="/usr/share/applications/codium.desktop"
 CODIUM_URL_DESKTOP_SOURCE="/usr/share/applications/codium-url-handler.desktop"
 CODIUM_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium.desktop"
 CODIUM_URL_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-url-handler.desktop"
+CODIUM_HONEY_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-honey.desktop"
+CODIUM_HONEY_USER_DATA_DIR="$CONFIG_HOME/VSCodium-Honey"
+CODIUM_HONEY_EXTENSIONS_DIR="$DATA_HOME/honey/codium/extensions"
 CODIUM_WRAPPER="/usr/bin/codium"
 HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=slight)
 
@@ -58,6 +67,7 @@ Uso:
   honey apply        Activa fontconfig y compatibilidad GTK/KDE/Electron
   honey reset        Retira Honey y restaura configs originales conocidas
   honey launch-codium [RUTA] Abre Codium con los flags de Honey
+  honey launch-honey-codium [RUTA] Abre una instancia aislada para diagnostico
   honey status       Muestra estado y muestras de fontconfig
   honey doctor       Revisa dependencias y rutas
   honey paths        Muestra rutas usadas
@@ -68,7 +78,7 @@ Honey no necesita sudo. Sus cambios viven en:
   ~/.config/fontconfig/conf.d/99-honey.conf
 
 Tambien sincroniza, con respaldo, estas capas cuando existen:
-  GTK 3/4, xsettingsd, KDE/kdeglobals, flags y lanzadores de Electron/Codium.
+  GTK 3/4, xsettingsd, KDE/kdeglobals y entorno de sesion KDE/DBus.
 EOF
 }
 
@@ -83,12 +93,16 @@ print_paths() {
     printf 'STATE_DIR=%s\n' "$STATE_DIR"
     printf 'BACKUP_DIR=%s\n' "$BACKUP_DIR"
     printf 'ORIGINAL_DIR=%s\n' "$ORIGINAL_DIR"
+    printf 'HONEY_ENVIRONMENT_TARGET=%s\n' "$HONEY_ENVIRONMENT_TARGET"
+    printf 'HONEY_PLASMA_ENV_TARGET=%s\n' "$HONEY_PLASMA_ENV_TARGET"
     printf 'GTK3_SETTINGS=%s\n' "$GTK3_SETTINGS"
     printf 'GTK4_SETTINGS=%s\n' "$GTK4_SETTINGS"
     printf 'XSETTINGSD_CONFIG=%s\n' "$XSETTINGSD_CONFIG"
     printf 'KDE_GLOBALS=%s\n' "$KDE_GLOBALS"
     printf 'CODIUM_FLAGS=%s\n' "$CODIUM_FLAGS"
     printf 'CODIUM_DESKTOP_TARGET=%s\n' "$CODIUM_DESKTOP_TARGET"
+    printf 'CODIUM_HONEY_DESKTOP_TARGET=%s\n' "$CODIUM_HONEY_DESKTOP_TARGET"
+    printf 'CODIUM_HONEY_USER_DATA_DIR=%s\n' "$CODIUM_HONEY_USER_DATA_DIR"
 }
 
 is_managed_profile() {
@@ -146,6 +160,70 @@ refresh_cache() {
     else
         warn "fc-cache no esta disponible; reinicia tus aplicaciones despues de aplicar cambios"
     fi
+}
+
+write_session_environment() {
+    mkdir -p "$ENVIRONMENT_DIR" "$PLASMA_ENV_DIR"
+    remember_original "$HONEY_ENVIRONMENT_TARGET" "90-honey.conf"
+    remember_original "$HONEY_PLASMA_ENV_TARGET" "90-honey.sh"
+
+    cat > "$HONEY_ENVIRONMENT_TARGET" <<EOF
+# Managed by Honey
+HONEY_ACTIVE=$HONEY_ACTIVE_VALUE
+HONEY_FONTCONFIG=$PROFILE_TARGET
+FREETYPE_PROPERTIES=$HONEY_FREETYPE_PROPERTIES
+EOF
+
+    cat > "$HONEY_PLASMA_ENV_TARGET" <<EOF
+#!/usr/bin/env sh
+# Managed by Honey
+export HONEY_ACTIVE="$HONEY_ACTIVE_VALUE"
+export HONEY_FONTCONFIG="$PROFILE_TARGET"
+export FREETYPE_PROPERTIES="$HONEY_FREETYPE_PROPERTIES"
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES >/dev/null 2>&1 || true
+fi
+
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES >/dev/null 2>&1 || true
+fi
+EOF
+
+    chmod +x "$HONEY_PLASMA_ENV_TARGET"
+}
+
+apply_running_session_environment() {
+    export HONEY_ACTIVE="$HONEY_ACTIVE_VALUE"
+    export HONEY_FONTCONFIG="$PROFILE_TARGET"
+    export FREETYPE_PROPERTIES="$HONEY_FREETYPE_PROPERTIES"
+
+    if command_exists systemctl; then
+        systemctl --user import-environment HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES >/dev/null 2>&1 || \
+            warn "No pude importar el entorno Honey a systemd user en esta sesion"
+    fi
+
+    if command_exists dbus-update-activation-environment; then
+        dbus-update-activation-environment --systemd HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES >/dev/null 2>&1 || \
+            warn "No pude importar el entorno Honey a DBus en esta sesion"
+    fi
+}
+
+reset_running_session_environment() {
+    unset HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES
+
+    if command_exists systemctl; then
+        systemctl --user unset-environment HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES >/dev/null 2>&1 || true
+    fi
+
+    if command_exists dbus-update-activation-environment; then
+        dbus-update-activation-environment --systemd HONEY_ACTIVE HONEY_FONTCONFIG FREETYPE_PROPERTIES >/dev/null 2>&1 || true
+    fi
+}
+
+apply_kde_session_environment() {
+    write_session_environment
+    apply_running_session_environment
 }
 
 set_ini_value() {
@@ -329,6 +407,33 @@ patch_codium_desktop_file() {
     mv -f "$tmp" "$target"
 }
 
+write_codium_honey_desktop_file() {
+    mkdir -p "$LOCAL_APPLICATIONS_DIR" "$CODIUM_HONEY_USER_DATA_DIR" "$CODIUM_HONEY_EXTENSIONS_DIR"
+    remember_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
+
+    cat > "$CODIUM_HONEY_DESKTOP_TARGET" <<EOF
+[Desktop Entry]
+Name=VSCodium Honey
+Comment=VSCodium isolated Honey render instance
+GenericName=Text Editor
+Exec=/usr/bin/codium --user-data-dir $CODIUM_HONEY_USER_DATA_DIR --extensions-dir $CODIUM_HONEY_EXTENSIONS_DIR --disable-lcd-text --font-render-hinting=slight %F
+Icon=vscodium
+Type=Application
+StartupNotify=false
+StartupWMClass=VSCodium
+Categories=TextEditor;Development;IDE;
+MimeType=text/plain;inode/directory;application/x-codium-workspace;
+Actions=new-empty-window;
+Keywords=honey;vscodium;codium;vscode;
+
+[Desktop Action new-empty-window]
+Name=New Honey Window
+Name[es]=Nueva ventana Honey
+Exec=/usr/bin/codium --user-data-dir $CODIUM_HONEY_USER_DATA_DIR --extensions-dir $CODIUM_HONEY_EXTENSIONS_DIR --disable-lcd-text --font-render-hinting=slight --new-window %F
+Icon=vscodium
+EOF
+}
+
 refresh_desktop_launchers() {
     if command_exists update-desktop-database; then
         update-desktop-database "$LOCAL_APPLICATIONS_DIR" >/dev/null 2>&1 || true
@@ -344,6 +449,18 @@ refresh_desktop_launchers() {
 apply_codium_launchers() {
     patch_codium_desktop_file "$CODIUM_DESKTOP_SOURCE" "$CODIUM_DESKTOP_TARGET" "codium.desktop"
     patch_codium_desktop_file "$CODIUM_URL_DESKTOP_SOURCE" "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
+    write_codium_honey_desktop_file
+    refresh_desktop_launchers
+}
+
+restore_legacy_app_overrides() {
+    restore_original "$CODIUM_FLAGS" "codium-flags.conf"
+    restore_original "$CODE_FLAGS" "code-flags.conf"
+    restore_original "$VSCODE_OSS_FLAGS" "vscode-oss-flags.conf"
+    restore_original "$ELECTRON_FLAGS" "electron-flags.conf"
+    restore_original "$CODIUM_DESKTOP_TARGET" "codium.desktop"
+    restore_original "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
+    restore_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
     refresh_desktop_launchers
 }
 
@@ -351,12 +468,14 @@ apply_compatibility() {
     apply_gtk_config
     apply_xsettingsd_config
     apply_kde_config
-    apply_electron_flags
-    apply_codium_launchers
-    ok "Compatibilidad GTK/KDE/Electron aplicada"
+    apply_kde_session_environment
+    restore_legacy_app_overrides
+    ok "Compatibilidad GTK/KDE/Electron aplicada desde la sesion"
 }
 
 reset_compatibility() {
+    restore_original "$HONEY_ENVIRONMENT_TARGET" "90-honey.conf"
+    restore_original "$HONEY_PLASMA_ENV_TARGET" "90-honey.sh"
     restore_original "$GTK3_SETTINGS" "gtk3-settings.ini"
     restore_original "$GTK4_SETTINGS" "gtk4-settings.ini"
     restore_original "$XSETTINGSD_CONFIG" "xsettingsd.conf"
@@ -367,6 +486,8 @@ reset_compatibility() {
     restore_original "$ELECTRON_FLAGS" "electron-flags.conf"
     restore_original "$CODIUM_DESKTOP_TARGET" "codium.desktop"
     restore_original "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
+    restore_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
+    reset_running_session_environment
     refresh_desktop_launchers
 }
 
@@ -467,6 +588,18 @@ print_desktop_exec() {
     awk '/^Exec=/ { print; found = 1; exit } END { if (!found) printf "unset" }' "$file"
 }
 
+print_managed_file_state() {
+    local file="$1"
+
+    if [[ -f "$file" ]] && grep -q "$MARKER" "$file"; then
+        printf 'active'
+    elif [[ -f "$file" ]]; then
+        printf 'custom'
+    else
+        printf 'missing'
+    fi
+}
+
 status() {
     printf 'Honey %s\n' "$VERSION"
 
@@ -488,12 +621,15 @@ status() {
     print_match "emoji"
 
     printf '\nCompatibilidad:\n'
+    printf 'KDE environment.d -> %s\n' "$(print_managed_file_state "$HONEY_ENVIRONMENT_TARGET")"
+    printf 'Plasma env hook -> %s\n' "$(print_managed_file_state "$HONEY_PLASMA_ENV_TARGET")"
+    printf 'Honey FREETYPE target -> %s\n' "$HONEY_FREETYPE_PROPERTIES"
+    printf 'Current process FREETYPE -> %s\n' "${FREETYPE_PROPERTIES:-unset}"
     printf 'GTK3 hintstyle -> %s\n' "$(print_ini_value "$GTK3_SETTINGS" "Settings" "gtk-xft-hintstyle")"
     printf 'GTK4 hintstyle -> %s\n' "$(print_ini_value "$GTK4_SETTINGS" "Settings" "gtk-xft-hintstyle")"
     printf 'xsettingsd hintstyle -> %s\n' "$(print_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle")"
     printf 'KDE XftHintStyle -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "XftHintStyle")"
-    printf 'Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
-    printf 'Codium desktop -> %s\n' "$(print_desktop_exec "$CODIUM_DESKTOP_TARGET")"
+    printf 'Legacy Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
 }
 
 doctor() {
@@ -509,7 +645,8 @@ doctor() {
     if [[ -e "$GTK3_SETTINGS" ]]; then ok "GTK3 settings encontrado"; else warn "GTK3 settings no encontrado"; fi
     if [[ -e "$GTK4_SETTINGS" ]]; then ok "GTK4 settings encontrado"; else warn "GTK4 settings no encontrado"; fi
     if [[ -e "$CODIUM_FLAGS" ]]; then ok "codium-flags encontrado"; else warn "codium-flags no encontrado"; fi
-    if [[ -f "$CODIUM_DESKTOP_TARGET" ]]; then ok "launcher local de Codium encontrado"; else warn "launcher local de Codium no encontrado"; fi
+    if [[ -f "$HONEY_ENVIRONMENT_TARGET" ]]; then ok "environment.d Honey encontrado"; else warn "environment.d Honey no encontrado"; fi
+    if [[ -f "$HONEY_PLASMA_ENV_TARGET" ]]; then ok "hook Plasma Honey encontrado"; else warn "hook Plasma Honey no encontrado"; fi
     if [[ -d "$(dirname "$PROFILE_TARGET")" || -w "${XDG_CONFIG_HOME:-$HOME/.config}" ]]; then
         ok "directorio de configuracion disponible"
     else
@@ -529,6 +666,23 @@ launch_codium() {
     "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
 }
 
+launch_honey_codium() {
+    local bin="$CODIUM_WRAPPER"
+
+    if [[ ! -x "$bin" ]]; then
+        bin="$(command -v codium || true)"
+    fi
+
+    [[ -n "$bin" ]] || die "No encontre codium"
+    mkdir -p "$CODIUM_HONEY_USER_DATA_DIR" "$CODIUM_HONEY_EXTENSIONS_DIR"
+
+    "$bin" \
+        --user-data-dir "$CODIUM_HONEY_USER_DATA_DIR" \
+        --extensions-dir "$CODIUM_HONEY_EXTENSIONS_DIR" \
+        "${HONEY_ELECTRON_FLAGS[@]}" \
+        "$@"
+}
+
 main() {
     local command_name="${1:-help}"
     shift || true
@@ -537,6 +691,7 @@ main() {
         apply) apply_profile ;;
         reset) reset_profile ;;
         launch-codium) launch_codium "$@" ;;
+        launch-honey-codium) launch_honey_codium "$@" ;;
         status) status ;;
         doctor) doctor ;;
         paths) print_paths ;;
