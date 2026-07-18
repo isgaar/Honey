@@ -14,112 +14,85 @@ honey help
 honey version
 ```
 
-## Crear un programa
+## Aplicar el perfil
 
 ```bash
-honey new app.hny
+honey apply
 ```
 
-Eso crea:
+Este comando:
 
-```honey
-# Programa Honey
-print Hola desde Honey
-env USER
-```
+- crea `~/.config/fontconfig/conf.d` si hace falta;
+- respalda un `99-honey.conf` previo si no fue creado por Honey;
+- copia el perfil de Honey;
+- regenera cache con `fc-cache` cuando esta disponible.
 
-## Ejecutar un programa
+## Ver estado
 
 ```bash
-honey run app.hny
+honey status
 ```
 
-Tambien puedes ejecutar el ejemplo incluido:
+Muestra:
+
+- si el perfil esta activo;
+- donde esta el archivo fuente;
+- donde esta el archivo aplicado;
+- que fuentes resuelve `fontconfig` para familias comunes.
+
+## Retirar el perfil
 
 ```bash
-honey run examples/hello.hny
+honey reset
 ```
 
-## Revisar entorno
+Honey solo elimina el archivo activo cuando detecta su marca interna:
+
+```text
+Managed by Honey
+```
+
+Si el archivo no parece suyo, termina con error para evitar borrar trabajo
+manual.
+
+## Diagnostico
 
 ```bash
 honey doctor
 ```
 
-Este comando imprime informacion util para depurar rutas y version de Bash.
+Sirve para revisar:
 
-## Formato `.hny`
+- Bash;
+- `fc-cache`;
+- `fc-match`;
+- perfil fuente;
+- rutas de configuracion.
 
-Un archivo Honey es texto plano. Cada linea contiene una instruccion.
+## Rutas
 
-Ejemplo:
-
-```honey
-# Las lineas que empiezan con # son comentarios
-print Iniciando
-env HOME
-sleep 1
-print Listo
+```bash
+honey paths
 ```
 
-Reglas actuales:
-
-- Las lineas vacias se ignoran.
-- Las lineas con `#` al inicio se ignoran.
-- Los comandos se evaluan de arriba hacia abajo.
-- Si aparece un comando desconocido, Honey termina con error.
-
-## Comandos del lenguaje
-
-### print
-
-Imprime texto.
-
-```honey
-print Hola mundo
-```
-
-Salida:
+Salida esperada:
 
 ```text
-Hola mundo
+ROOT_DIR=/home/ismael/.local/share/honey
+PROFILE_SOURCE=/home/ismael/.local/share/honey/config/fontconfig/99-honey.conf
+PROFILE_TARGET=/home/ismael/.config/fontconfig/conf.d/99-honey.conf
+STATE_DIR=/home/ismael/.local/state/honey
+BACKUP_DIR=/home/ismael/.local/state/honey/backups
 ```
 
-### env
+## Flujo recomendado
 
-Imprime el valor de una variable de entorno.
-
-```honey
-env HOME
+```bash
+./installer.sh install
+honey apply
+honey status
 ```
 
-Si la variable no existe, imprime una linea vacia.
-
-### sleep
-
-Pausa la ejecucion durante un numero de segundos.
-
-```honey
-sleep 1
-```
-
-Tambien acepta decimales:
-
-```honey
-sleep 0.5
-```
-
-### exit
-
-Termina la ejecucion con un codigo numerico.
-
-```honey
-exit 0
-```
-
-## Codigos de salida
-
-- `0`: ejecucion correcta.
-- `1`: error general.
-- Otro codigo: puede venir de `exit CODIGO` dentro del programa.
+Despues de aplicar, reabre las aplicaciones donde quieras ver el cambio:
+terminal, editor, navegador, paneles y lanzadores.
 

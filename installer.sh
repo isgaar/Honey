@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Honey installer
-# Instala el runtime en modo usuario, sin sudo y sin modificar archivos del sistema.
+# Instala la capa tipografica en modo usuario, sin sudo.
 
 set -Eeuo pipefail
 
 APP_NAME="Honey"
-APP_VERSION="0.1.0"
+APP_VERSION="0.2.0"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX="${HONEY_PREFIX:-$HOME/.local}"
 INSTALL_DIR="${HONEY_HOME:-$HOME/.local/share/honey}"
@@ -26,8 +26,10 @@ usage() {
 Honey installer
 
 Uso:
-  ./installer.sh install      Instala Honey en ~/.local/share/honey
-  ./installer.sh uninstall    Elimina la instalacion local de Honey
+  ./installer.sh install      Instala el comando honey y sus archivos
+  ./installer.sh uninstall    Elimina Honey y su perfil gestionado
+  ./installer.sh apply        Aplica el perfil tipografico instalado
+  ./installer.sh reset        Retira el perfil tipografico activo
   ./installer.sh doctor       Revisa dependencias y rutas
   ./installer.sh paths        Muestra rutas usadas por el instalador
   ./installer.sh help         Muestra esta ayuda
@@ -38,7 +40,8 @@ Variables:
 
 Ejemplos:
   ./installer.sh install
-  HONEY_PREFIX="$HOME/.local" ./installer.sh install
+  honey apply
+  honey status
 EOF
 }
 
@@ -54,7 +57,17 @@ print_paths() {
     printf 'BIN_PATH=%s\n' "$BIN_PATH"
 }
 
-copy_runtime() {
+copy_tree() {
+    local name="$1"
+    [[ -d "$SOURCE_DIR/$name" ]] || return 0
+    rm -rf "$INSTALL_DIR/$name"
+    cp -R "$SOURCE_DIR/$name" "$INSTALL_DIR/$name"
+}
+
+install_files() {
+    [[ -f "$SOURCE_DIR/bin/honey" ]] || fail "No existe $SOURCE_DIR/bin/honey"
+    [[ -f "$SOURCE_DIR/config/fontconfig/99-honey.conf" ]] || fail "No existe el perfil fontconfig de Honey"
+
     mkdir -p "$INSTALL_DIR" "$BIN_DIR"
 
     cp -f "$SOURCE_DIR/README.md" "$INSTALL_DIR/README.md"
@@ -62,30 +75,45 @@ copy_runtime() {
     cp -f "$SOURCE_DIR/CHANGELOG.md" "$INSTALL_DIR/CHANGELOG.md" 2>/dev/null || true
     cp -f "$SOURCE_DIR/LICENSE" "$INSTALL_DIR/LICENSE" 2>/dev/null || true
 
-    rm -rf "$INSTALL_DIR/bin" "$INSTALL_DIR/docs" "$INSTALL_DIR/examples"
-    cp -R "$SOURCE_DIR/bin" "$INSTALL_DIR/bin"
-    cp -R "$SOURCE_DIR/docs" "$INSTALL_DIR/docs"
-    cp -R "$SOURCE_DIR/examples" "$INSTALL_DIR/examples"
+    copy_tree "bin"
+    copy_tree "config"
+    copy_tree "docs"
+    copy_tree "examples"
 
     chmod +x "$INSTALL_DIR/bin/honey"
     chmod +x "$INSTALL_DIR/installer.sh"
+    [[ -f "$INSTALL_DIR/examples/check-rendering.sh" ]] && chmod +x "$INSTALL_DIR/examples/check-rendering.sh"
+    ln -sfn "$INSTALL_DIR/bin/honey" "$BIN_PATH"
 }
 
-install_runtime() {
-    [[ -f "$SOURCE_DIR/bin/honey" ]] || fail "No existe $SOURCE_DIR/bin/honey"
-
-    copy_runtime
-    ln -sfn "$INSTALL_DIR/bin/honey" "$BIN_PATH"
+install_honey() {
+    install_files
 
     ok "$APP_NAME $APP_VERSION instalado en $INSTALL_DIR"
     ok "Comando disponible en $BIN_PATH"
 
     if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-        warn "$BIN_DIR no esta en PATH. Agrega: export PATH=\"\$HOME/.local/bin:\$PATH\""
+        warn "$BIN_DIR no esta en PATH. Agrega: export PATH=\"$BIN_DIR:\$PATH\""
+    fi
+
+    warn "El perfil aun no esta activo. Ejecuta: honey apply"
+}
+
+run_honey() {
+    local action="$1"
+
+    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then
+        "$INSTALL_DIR/bin/honey" "$action"
+    elif [[ -x "$SOURCE_DIR/bin/honey" ]]; then
+        "$SOURCE_DIR/bin/honey" "$action"
+    else
+        fail "No se encontro el comando honey"
     fi
 }
 
-uninstall_runtime() {
+uninstall_honey() {
+    run_honey reset || true
+
     if [[ -L "$BIN_PATH" ]] && [[ "$(readlink "$BIN_PATH")" == "$INSTALL_DIR/bin/honey" ]]; then
         rm -f "$BIN_PATH"
         ok "Shim eliminado: $BIN_PATH"
@@ -107,10 +135,12 @@ doctor() {
     printf '\nDependencias:\n'
 
     if command_exists bash; then ok "bash encontrado"; else fail "bash no encontrado"; fi
+    if command_exists fc-cache; then ok "fc-cache encontrado"; else warn "fc-cache no encontrado"; fi
+    if command_exists fc-match; then ok "fc-match encontrado"; else warn "fc-match no encontrado"; fi
     if command_exists git; then ok "git encontrado"; else warn "git no encontrado, solo afecta publicacion/desarrollo"; fi
 
     printf '\nEstado:\n'
-    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then ok "runtime instalado"; else warn "runtime no instalado"; fi
+    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then ok "Honey instalado"; else warn "Honey no instalado"; fi
     if [[ -L "$BIN_PATH" ]]; then ok "shim honey existe"; else warn "shim honey no existe"; fi
     if [[ ":$PATH:" == *":$BIN_DIR:"* ]]; then ok "$BIN_DIR esta en PATH"; else warn "$BIN_DIR no esta en PATH"; fi
 }
@@ -119,8 +149,10 @@ main() {
     local command_name="${1:-install}"
 
     case "$command_name" in
-        install) install_runtime ;;
-        uninstall) uninstall_runtime ;;
+        install) install_honey ;;
+        uninstall) uninstall_honey ;;
+        apply) install_files && run_honey apply ;;
+        reset) run_honey reset ;;
         doctor) doctor ;;
         paths) print_paths ;;
         help|-h|--help) usage ;;
@@ -132,4 +164,3 @@ main() {
 }
 
 main "$@"
-

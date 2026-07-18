@@ -1,28 +1,37 @@
 # Honey
 
-Honey es un runtime ligero pensado para crecer desde una base simple: un
-instalador en Bash, un comando `honey`, ejemplos pequenos y documentacion clara.
+Honey es una capa de ajuste tipografico para Linux. Su objetivo es dejar el
+texto mas limpio, consistente y suave sin depender de cambios globales del
+sistema ni de configuraciones dificiles de recordar.
 
-El proyecto queda listo para usarse en local y tambien para publicarse en:
+Honey trabaja en modo usuario: instala un comando `honey`, guarda una plantilla
+de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 
-```bash
-https://github.com/isgaar/Honey.git
-```
+## Que hace
+
+- Activa antialiasing.
+- Usa hinting ligero para evitar trazos duros.
+- Prefiere render grayscale en lugar de subpixel RGB.
+- Desactiva bitmaps incrustados para fuentes escalables.
+- Define una prioridad razonable de fuentes sans, serif, mono y emoji.
+- Regenera la cache de fuentes cuando `fc-cache` esta disponible.
+- Mantiene todo bajo `$HOME`, sin `sudo`.
 
 ## Que incluye
 
-- `installer.sh`: instala Honey en modo usuario, sin tocar rutas del sistema.
-- `bin/honey`: comando principal del runtime.
-- `examples/hello.hny`: primer programa de ejemplo.
-- `docs/`: documentacion extendida de instalacion, uso, runtime, desarrollo y GitHub.
-- `scripts/publish-github.sh`: automatiza el `git init`, commit, remote y push.
+- `installer.sh`: instala o desinstala Honey en modo usuario.
+- `bin/honey`: comando principal para aplicar, retirar y revisar el perfil.
+- `config/fontconfig/99-honey.conf`: perfil tipografico versionado.
+- `examples/check-rendering.sh`: ejemplo de diagnostico local.
+- `docs/`: documentacion extensa de instalacion, uso, render, desarrollo y GitHub.
+- `scripts/publish-github.sh`: flujo de publicacion del repositorio.
 
 ## Instalacion rapida
 
 Desde esta carpeta:
 
 ```bash
-chmod +x installer.sh bin/honey scripts/publish-github.sh
+chmod +x installer.sh bin/honey examples/check-rendering.sh scripts/publish-github.sh
 ./installer.sh install
 ```
 
@@ -32,26 +41,20 @@ Si `~/.local/bin` no esta en tu `PATH`, agrega esto a tu shell:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Despues prueba:
+Despues aplica el perfil:
 
 ```bash
-honey version
-honey run examples/hello.hny
+honey apply
+honey status
+```
+
+Para retirar el perfil:
+
+```bash
+honey reset
 ```
 
 ## Uso basico
-
-Crear un archivo nuevo:
-
-```bash
-honey new app.hny
-```
-
-Ejecutarlo:
-
-```bash
-honey run app.hny
-```
 
 Ver ayuda:
 
@@ -59,38 +62,62 @@ Ver ayuda:
 honey help
 ```
 
-## Lenguaje minimo actual
+Aplicar Honey:
 
-Honey interpreta por ahora instrucciones simples, una por linea:
-
-```honey
-# Comentario
-print Hola desde Honey
-env HOME
-sleep 1
-print Fin
+```bash
+honey apply
 ```
 
-Comandos disponibles:
+Revisar estado:
 
-- `print TEXTO`: imprime texto.
-- `env VARIABLE`: imprime una variable de entorno.
-- `sleep SEGUNDOS`: pausa la ejecucion.
-- `exit CODIGO`: termina con un codigo numerico.
+```bash
+honey status
+```
 
-Este lenguaje minimo existe para que el runtime sea ejecutable desde el primer
-dia. La especificacion puede cambiar conforme el proyecto madure.
+Ver rutas usadas:
+
+```bash
+honey paths
+```
+
+Retirar el perfil:
+
+```bash
+honey reset
+```
+
+## Rutas importantes
+
+Honey instala sus archivos en:
+
+```bash
+$HOME/.local/share/honey
+```
+
+El comando queda en:
+
+```bash
+$HOME/.local/bin/honey
+```
+
+El perfil activo de fontconfig queda en:
+
+```bash
+$HOME/.config/fontconfig/conf.d/99-honey.conf
+```
+
+Si ya existe un archivo con ese nombre y no fue creado por Honey, el comando
+`honey apply` crea un respaldo antes de reemplazarlo.
 
 ## Publicar en GitHub
 
-El flujo que pediste queda integrado en `scripts/publish-github.sh`. Puedes
-ejecutarlo asi:
+El flujo de publicacion queda integrado en `scripts/publish-github.sh`:
 
 ```bash
 ./scripts/publish-github.sh
 ```
 
-Internamente usa este remote:
+Remote usado:
 
 ```bash
 https://github.com/isgaar/Honey.git
@@ -107,14 +134,11 @@ git remote add origin https://github.com/isgaar/Honey.git
 git push -u origin main
 ```
 
-Nota: como este README ya existe, no hace falta ejecutar
-`echo "# Honey" >> README.md`.
-
 ## Documentacion
 
 - [Instalacion](docs/INSTALL.md)
 - [Uso](docs/USAGE.md)
-- [Especificacion del runtime](docs/RUNTIME_SPEC.md)
+- [Modelo de render](docs/RENDERING.md)
 - [Desarrollo](docs/DEVELOPMENT.md)
 - [Publicacion en GitHub](docs/GITHUB.md)
 - [Solucion de problemas](docs/TROUBLESHOOTING.md)
@@ -123,8 +147,8 @@ Nota: como este README ya existe, no hace falta ejecutar
 
 Honey esta en etapa inicial. La prioridad de esta base es que el proyecto tenga:
 
-- estructura ordenada,
 - instalacion reproducible,
-- comandos faciles de recordar,
-- documentacion suficiente para volver al proyecto sin perder contexto.
+- cambios faciles de revisar,
+- activacion y retiro sin friccion,
+- documentacion suficiente para ajustar el render con confianza.
 

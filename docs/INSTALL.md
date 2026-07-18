@@ -1,23 +1,25 @@
 # Instalacion de Honey
 
-Esta guia explica como instalar Honey desde la carpeta del proyecto.
+Esta guia explica como instalar Honey sin tocar rutas del sistema.
 
 ## Requisitos
 
 Honey necesita:
 
-- Bash 4 o superior.
-- Permisos de escritura en tu usuario.
+- Bash.
+- `fontconfig`, normalmente ya instalado en escritorios Linux.
+- `fc-cache` para regenerar cache de fuentes.
+- `fc-match` para diagnostico.
 - `git` solo si vas a publicar o trabajar con versiones.
 
-No necesita `sudo` para instalarse.
+No necesita `sudo`.
 
 ## Instalacion recomendada
 
 Desde `Documentos/Honey`:
 
 ```bash
-chmod +x installer.sh bin/honey scripts/publish-github.sh
+chmod +x installer.sh bin/honey examples/check-rendering.sh scripts/publish-github.sh
 ./installer.sh install
 ```
 
@@ -44,7 +46,7 @@ Compruebalo:
 printf '%s\n' "$PATH"
 ```
 
-Si falta, agrega esto a `~/.bashrc`, `~/.zshrc` o el archivo equivalente:
+Si falta, agrega esto a tu shell:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -56,19 +58,55 @@ Recarga la terminal:
 source ~/.bashrc
 ```
 
+## Activar el perfil
+
+Instalar Honey solo instala el comando y sus archivos. Para activar el perfil:
+
+```bash
+honey apply
+```
+
+Honey escribira:
+
+```bash
+$HOME/.config/fontconfig/conf.d/99-honey.conf
+```
+
+Despues regenera la cache si `fc-cache` esta disponible.
+
 ## Verificar instalacion
 
 ```bash
 honey version
 honey doctor
-honey run examples/hello.hny
+honey status
 ```
 
-Si estas fuera de la carpeta del proyecto, ejecuta el ejemplo instalado:
+Tambien puedes ejecutar el ejemplo:
 
 ```bash
-honey run "$HOME/.local/share/honey/examples/hello.hny"
+~/.local/share/honey/examples/check-rendering.sh
 ```
+
+## Retirar el perfil
+
+```bash
+honey reset
+```
+
+Eso elimina `99-honey.conf` solo si el archivo contiene la marca de Honey.
+
+## Desinstalar todo
+
+```bash
+./installer.sh uninstall
+```
+
+Esto elimina:
+
+- el perfil activo de Honey, si existe;
+- el enlace `~/.local/bin/honey`, si apunta a esta instalacion;
+- el directorio `~/.local/share/honey`.
 
 ## Instalar en otra ruta
 
@@ -89,31 +127,4 @@ Tambien puedes usar ambas variables:
 ```bash
 HONEY_PREFIX="$HOME/.local" HONEY_HOME="$HOME/apps/honey" ./installer.sh install
 ```
-
-## Desinstalar
-
-```bash
-./installer.sh uninstall
-```
-
-Esto elimina:
-
-- el enlace `~/.local/bin/honey`, si apunta a la instalacion de Honey;
-- el directorio `~/.local/share/honey`.
-
-No elimina tus programas `.hny` creados en otras carpetas.
-
-## Diagnostico
-
-```bash
-./installer.sh doctor
-```
-
-Ese comando muestra:
-
-- rutas usadas por el instalador,
-- si `bash` esta disponible,
-- si `git` esta disponible,
-- si Honey ya esta instalado,
-- si `~/.local/bin` esta en `PATH`.
 

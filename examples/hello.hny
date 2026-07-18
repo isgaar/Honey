@@ -1,5 +1,0 @@
-# Primer programa Honey
-print Hola desde Honey
-print Este runtime ya puede leer archivos .hny
-env USER
-

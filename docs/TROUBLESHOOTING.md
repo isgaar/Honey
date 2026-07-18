@@ -23,67 +23,85 @@ Para hacerlo permanente, agrega esa linea a tu archivo de shell.
 Falta permiso de ejecucion.
 
 ```bash
-chmod +x installer.sh bin/honey scripts/publish-github.sh
+chmod +x installer.sh bin/honey examples/check-rendering.sh scripts/publish-github.sh
 ```
 
-## El instalador no encuentra `bin/honey`
+## `fc-cache no esta disponible`
 
-Asegurate de ejecutar el instalador desde una copia completa del repo:
+Instala `fontconfig` con tu gestor de paquetes.
+
+Debian/Ubuntu:
 
 ```bash
-cd ~/Documentos/Honey
-./installer.sh install
+sudo apt install fontconfig
 ```
 
-## El ejemplo no corre fuera del repo
-
-Si estas fuera de `Documentos/Honey`, usa la ruta instalada:
+Fedora:
 
 ```bash
-honey run "$HOME/.local/share/honey/examples/hello.hny"
+sudo dnf install fontconfig
 ```
 
-## Git dice que no sabe quien eres
-
-Configura tu identidad:
+Arch:
 
 ```bash
-git config --global user.name "Ismael"
-git config --global user.email "tu-email@example.com"
+sudo pacman -S fontconfig
 ```
 
-Luego repite el commit.
+## No veo cambios
 
-## El push a GitHub falla
-
-Revisa:
+Prueba:
 
 ```bash
-git remote -v
-git status
+honey status
+fc-match sans-serif
+fc-match monospace
 ```
 
-Si el repositorio remoto no existe, crealo en GitHub primero con el nombre
-`Honey`.
+Despues reabre las aplicaciones. Algunas leen configuracion de fuentes solo al
+arrancar.
 
-Si falla por credenciales, autentica GitHub CLI:
+## Una aplicacion se ve igual
+
+Puede ocurrir si esa aplicacion:
+
+- usa fuentes web propias;
+- fuerza su propio motor de texto;
+- esta aislada por su paquete;
+- define su fuente internamente.
+
+Honey mejora la base de `fontconfig`, pero no puede obligar a todas las apps a
+usar esa base.
+
+## Quiero retirar Honey
 
 ```bash
-gh auth login
+honey reset
 ```
 
-O cambia el remote a SSH:
-
-```bash
-git remote set-url origin git@github.com:isgaar/Honey.git
-```
-
-## Quiero empezar de cero la instalacion local
+Si quieres eliminar tambien la instalacion:
 
 ```bash
 ./installer.sh uninstall
-./installer.sh install
 ```
 
-Esto no borra el repositorio de desarrollo.
+## Honey no elimina `99-honey.conf`
+
+Honey solo borra el archivo si contiene su marca interna. Si modificaste el
+archivo manualmente y quieres retirarlo, revisalo antes:
+
+```bash
+less "$HOME/.config/fontconfig/conf.d/99-honey.conf"
+```
+
+Luego puedes moverlo a mano si estas seguro.
+
+## Quiero ver respaldos
+
+```bash
+ls -la "$HOME/.local/state/honey/backups"
+```
+
+Honey crea respaldos cuando encuentra un `99-honey.conf` previo que no fue
+generado por Honey.
 

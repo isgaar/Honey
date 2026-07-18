@@ -10,15 +10,18 @@ Honey/
   installer.sh
   bin/
     honey
+  config/
+    fontconfig/
+      99-honey.conf
   docs/
     INSTALL.md
     USAGE.md
-    RUNTIME_SPEC.md
+    RENDERING.md
     DEVELOPMENT.md
     GITHUB.md
     TROUBLESHOOTING.md
   examples/
-    hello.hny
+    check-rendering.sh
   scripts/
     publish-github.sh
 ```
@@ -27,44 +30,55 @@ Honey/
 
 `installer.sh`
 
-Instala el runtime en modo usuario. Debe mantenerse conservador: no usar `sudo`,
-no borrar archivos ajenos, no modificar configuraciones sin avisar.
+Instala el comando y la estructura de Honey bajo `$HOME/.local/share/honey`.
+Debe mantenerse conservador: no usar `sudo`, no borrar archivos ajenos y no
+activar cambios sin un comando explicito.
 
 `bin/honey`
 
-Es el runtime y CLI principal. Ahora esta escrito en Bash para que sea facil de
-leer y ejecutar en cualquier Linux comun.
+CLI principal. Aplica, retira y diagnostica el perfil tipografico.
 
-`docs/RUNTIME_SPEC.md`
+`config/fontconfig/99-honey.conf`
 
-Define lo que el lenguaje entiende. Si cambias sintaxis, actualiza este archivo.
+Perfil real que se copia a `~/.config/fontconfig/conf.d/99-honey.conf` cuando se
+ejecuta `honey apply`.
+
+`docs/RENDERING.md`
+
+Explica las decisiones del perfil. Si cambias `99-honey.conf`, actualiza este
+archivo.
 
 ## Flujo recomendado
 
-1. Cambia el codigo.
-2. Ejecuta el runtime directo desde el repo:
-
-```bash
-./bin/honey run examples/hello.hny
-```
-
-3. Ejecuta diagnostico:
+1. Cambia el codigo o el perfil.
+2. Ejecuta diagnostico desde el repo:
 
 ```bash
 ./bin/honey doctor
-./installer.sh doctor
 ```
 
-4. Instala de nuevo:
+3. Instala en modo usuario:
 
 ```bash
 ./installer.sh install
 ```
 
-5. Prueba el comando instalado:
+4. Aplica el perfil:
 
 ```bash
-honey run "$HOME/.local/share/honey/examples/hello.hny"
+honey apply
+```
+
+5. Revisa estado:
+
+```bash
+honey status
+```
+
+6. Si algo no convence, retira el perfil:
+
+```bash
+honey reset
 ```
 
 ## Estilo de Bash
@@ -73,7 +87,7 @@ Preferencias del proyecto:
 
 - usar `set -Eeuo pipefail`;
 - envolver errores con mensajes claros;
-- evitar `sudo` salvo que una version futura lo justifique muy bien;
+- evitar `sudo`;
 - mantener funciones pequenas;
 - usar nombres descriptivos;
 - preferir rutas bajo `$HOME`;
@@ -89,43 +103,12 @@ La version vive por ahora en:
 
 Cuando cambies version, actualiza los tres lugares.
 
-## Commits
-
-Mensajes recomendados:
-
-```text
-add runtime command
-update installer
-document honey syntax
-fix env command validation
-```
-
-Para el primer commit:
-
-```bash
-git add .
-git commit -m "first commit"
-```
-
 ## Pruebas manuales
 
-Caso correcto:
+Diagnostico:
 
 ```bash
-./bin/honey run examples/hello.hny
-```
-
-Archivo inexistente:
-
-```bash
-./bin/honey run missing.hny
-```
-
-Comando desconocido:
-
-```bash
-printf 'wat\n' > /tmp/bad.hny
-./bin/honey run /tmp/bad.hny
+./bin/honey doctor
 ```
 
 Instalacion:
@@ -135,9 +118,16 @@ Instalacion:
 honey version
 ```
 
-Desinstalacion:
+Aplicacion:
 
 ```bash
-./installer.sh uninstall
+honey apply
+honey status
+```
+
+Retiro:
+
+```bash
+honey reset
 ```
 

@@ -1,105 +1,159 @@
 #!/usr/bin/env bash
-# Honey runtime CLI
+# Honey CLI
 
 set -Eeuo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" == /* ]] || SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+
+ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+PROFILE_SOURCE="$ROOT_DIR/config/fontconfig/99-honey.conf"
+FONTCONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d"
+PROFILE_TARGET="$FONTCONFIG_DIR/99-honey.conf"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/honey"
+BACKUP_DIR="$STATE_DIR/backups"
+MARKER="Managed by Honey"
+
+green='\033[0;32m'
+yellow='\033[1;33m'
+red='\033[0;31m'
+reset='\033[0m'
+
+ok() { printf '%bOK%b %s\n' "$green" "$reset" "$1"; }
+warn() { printf '%bWARN%b %s\n' "$yellow" "$reset" "$1"; }
+die() { printf '%bERROR%b %s\n' "$red" "$reset" "$1" >&2; exit 1; }
 
 usage() {
     cat <<'EOF'
-Honey runtime
+Honey
 
 Uso:
-  honey run ARCHIVO.hny      Ejecuta un programa Honey
-  honey new ARCHIVO.hny      Crea un programa base
-  honey doctor               Revisa el entorno local
-  honey version              Muestra la version
-  honey help                 Muestra esta ayuda
+  honey apply        Activa el perfil tipografico de Honey
+  honey reset        Retira el perfil activo si fue gestionado por Honey
+  honey status       Muestra estado y muestras de fontconfig
+  honey doctor       Revisa dependencias y rutas
+  honey paths        Muestra rutas usadas
+  honey version      Muestra la version
+  honey help         Muestra esta ayuda
 
-Lenguaje actual:
-  print TEXTO                Imprime texto
-  env VARIABLE               Imprime una variable de entorno
-  sleep SEGUNDOS             Pausa la ejecucion
-  exit CODIGO                Termina con un codigo
+Honey no necesita sudo. Sus cambios viven en:
+  ~/.config/fontconfig/conf.d/99-honey.conf
 EOF
 }
 
-die() {
-    printf 'ERROR %s\n' "$1" >&2
-    exit 1
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
-trim() {
-    local value="$*"
-    value="${value#"${value%%[![:space:]]*}"}"
-    value="${value%"${value##*[![:space:]]}"}"
-    printf '%s' "$value"
+print_paths() {
+    printf 'ROOT_DIR=%s\n' "$ROOT_DIR"
+    printf 'PROFILE_SOURCE=%s\n' "$PROFILE_SOURCE"
+    printf 'PROFILE_TARGET=%s\n' "$PROFILE_TARGET"
+    printf 'STATE_DIR=%s\n' "$STATE_DIR"
+    printf 'BACKUP_DIR=%s\n' "$BACKUP_DIR"
 }
 
-run_file() {
-    local file="${1:-}"
-    [[ -n "$file" ]] || die "Falta archivo. Uso: honey run ARCHIVO.hny"
-    [[ -f "$file" ]] || die "No existe el archivo: $file"
-
-    local line raw line_number command_text value
-    line_number=0
-
-    while IFS= read -r raw || [[ -n "$raw" ]]; do
-        line_number=$((line_number + 1))
-        line="$(trim "$raw")"
-
-        [[ -z "$line" ]] && continue
-        [[ "$line" == \#* ]] && continue
-
-        case "$line" in
-            print\ *)
-                printf '%s\n' "${line#print }"
-                ;;
-            env\ *)
-                value="${line#env }"
-                value="$(trim "$value")"
-                [[ -n "$value" ]] || die "$file:$line_number env necesita un nombre"
-                printf '%s\n' "${!value-}"
-                ;;
-            sleep\ *)
-                value="${line#sleep }"
-                value="$(trim "$value")"
-                [[ "$value" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "$file:$line_number sleep necesita segundos numericos"
-                sleep "$value"
-                ;;
-            exit\ *)
-                value="${line#exit }"
-                value="$(trim "$value")"
-                [[ "$value" =~ ^[0-9]+$ ]] || die "$file:$line_number exit necesita un codigo numerico"
-                exit "$value"
-                ;;
-            *)
-                command_text="${line%% *}"
-                die "$file:$line_number comando desconocido: $command_text"
-                ;;
-        esac
-    done < "$file"
+is_managed_profile() {
+    [[ -f "$PROFILE_TARGET" ]] && grep -q "$MARKER" "$PROFILE_TARGET"
 }
 
-new_file() {
-    local file="${1:-}"
-    [[ -n "$file" ]] || die "Falta archivo. Uso: honey new ARCHIVO.hny"
-    [[ ! -e "$file" ]] || die "Ya existe: $file"
+backup_existing_profile() {
+    [[ -f "$PROFILE_TARGET" ]] || return 0
+    is_managed_profile && return 0
 
-    cat > "$file" <<'EOF'
-# Programa Honey
-print Hola desde Honey
-env USER
-EOF
+    mkdir -p "$BACKUP_DIR"
+    local stamp backup_path
+    stamp="$(date +%Y%m%d_%H%M%S)"
+    backup_path="$BACKUP_DIR/99-honey.conf.$stamp.bak"
+    cp -f "$PROFILE_TARGET" "$backup_path"
+    warn "Ya existia un perfil con ese nombre. Respaldo creado en $backup_path"
+}
 
-    printf 'Creado %s\n' "$file"
+refresh_cache() {
+    if command_exists fc-cache; then
+        fc-cache -f >/dev/null 2>&1 || warn "No se pudo regenerar la cache de fuentes"
+    else
+        warn "fc-cache no esta disponible; reinicia tus aplicaciones despues de aplicar cambios"
+    fi
+}
+
+apply_profile() {
+    [[ -f "$PROFILE_SOURCE" ]] || die "No existe el perfil fuente: $PROFILE_SOURCE"
+
+    mkdir -p "$FONTCONFIG_DIR"
+    backup_existing_profile
+    cp -f "$PROFILE_SOURCE" "$PROFILE_TARGET"
+    refresh_cache
+
+    ok "Perfil Honey aplicado en $PROFILE_TARGET"
+    warn "Reabre las aplicaciones que ya estaban abiertas para ver el cambio completo"
+}
+
+reset_profile() {
+    if [[ ! -f "$PROFILE_TARGET" ]]; then
+        warn "No hay perfil Honey activo en $PROFILE_TARGET"
+        return 0
+    fi
+
+    if ! is_managed_profile; then
+        die "El archivo $PROFILE_TARGET no parece gestionado por Honey; no lo elimino"
+    fi
+
+    rm -f "$PROFILE_TARGET"
+    refresh_cache
+    ok "Perfil Honey retirado"
+}
+
+print_match() {
+    local family="$1"
+    if command_exists fc-match; then
+        printf '%s -> %s\n' "$family" "$(fc-match "$family" 2>/dev/null | head -n 1)"
+    else
+        printf '%s -> fc-match no disponible\n' "$family"
+    fi
+}
+
+status() {
+    printf 'Honey %s\n' "$VERSION"
+
+    if is_managed_profile; then
+        ok "Perfil activo"
+    elif [[ -f "$PROFILE_TARGET" ]]; then
+        warn "Existe $PROFILE_TARGET, pero no parece gestionado por Honey"
+    else
+        warn "Perfil no activo"
+    fi
+
+    printf '\nRutas:\n'
+    print_paths
+
+    printf '\nFuentes resueltas:\n'
+    print_match "sans-serif"
+    print_match "serif"
+    print_match "monospace"
+    print_match "emoji"
 }
 
 doctor() {
     printf 'Honey %s\n' "$VERSION"
-    printf 'bash=%s\n' "${BASH_VERSION:-unknown}"
-    printf 'runtime=%s\n' "$(realpath "$0" 2>/dev/null || printf '%s' "$0")"
-    printf 'pwd=%s\n' "$PWD"
+    print_paths
+
+    printf '\nDependencias:\n'
+    if command_exists bash; then ok "bash encontrado"; else die "bash no encontrado"; fi
+    if command_exists fc-cache; then ok "fc-cache encontrado"; else warn "fc-cache no encontrado"; fi
+    if command_exists fc-match; then ok "fc-match encontrado"; else warn "fc-match no encontrado"; fi
+    if [[ -f "$PROFILE_SOURCE" ]]; then ok "perfil fuente encontrado"; else die "perfil fuente no encontrado"; fi
+    if [[ -d "$(dirname "$PROFILE_TARGET")" || -w "${XDG_CONFIG_HOME:-$HOME/.config}" ]]; then
+        ok "directorio de configuracion disponible"
+    else
+        warn "no se puede confirmar escritura en el directorio de configuracion"
+    fi
 }
 
 main() {
@@ -107,9 +161,11 @@ main() {
     shift || true
 
     case "$command_name" in
-        run) run_file "${1:-}" ;;
-        new) new_file "${1:-}" ;;
+        apply) apply_profile ;;
+        reset) reset_profile ;;
+        status) status ;;
         doctor) doctor ;;
+        paths) print_paths ;;
         version|-v|--version) printf 'Honey %s\n' "$VERSION" ;;
         help|-h|--help) usage ;;
         *)
@@ -120,4 +176,3 @@ main() {
 }
 
 main "$@"
-
