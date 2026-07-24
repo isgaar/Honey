@@ -30,6 +30,15 @@ Honey usa `hintmedium`:
 </edit>
 ```
 
+### Interfaz GTK/Firefox
+
+Honey usa `Inter Medium 10.5` solo como fuente de interfaz GTK. Esto da más
+cuerpo a Firefox y otras apps GTK sin forzar el peso de KDE ni el de las
+páginas web.
+
+En KDE, Honey eleva a peso 500 las fuentes base de `kdeglobals`; los pesos
+semibold y bold ya definidos se conservan.
+
 La intencion es conservar la forma natural de la fuente sin forzar demasiado la
 grilla de pixeles.
 
@@ -102,6 +111,7 @@ GTK:
 - `gtk-xft-hinting=1`
 - `gtk-xft-hintstyle=hintmedium`
 - `gtk-xft-rgba=none`
+- `gtk-font-name=Inter Medium 10.5`
 
 KDE:
 

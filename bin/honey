@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.4.5"
+VERSION="0.4.7"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -29,6 +29,8 @@ HONEY_ENVIRONMENT_TARGET="$ENVIRONMENT_DIR/90-honey.conf"
 HONEY_PLASMA_ENV_TARGET="$PLASMA_ENV_DIR/90-honey.sh"
 HONEY_ACTIVE_VALUE="1"
 HONEY_HINTSTYLE="hintmedium"
+HONEY_UI_FONT="Inter Medium 10.5"
+HONEY_KDE_FONT_WEIGHT="500"
 HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40"
 GTK3_SETTINGS="$CONFIG_HOME/gtk-3.0/settings.ini"
 GTK4_SETTINGS="$CONFIG_HOME/gtk-4.0/settings.ini"
@@ -335,6 +337,7 @@ apply_gtk_config() {
         set_ini_value "$file" "Settings" "gtk-xft-hinting" "1"
         set_ini_value "$file" "Settings" "gtk-xft-hintstyle" "$HONEY_HINTSTYLE"
         set_ini_value "$file" "Settings" "gtk-xft-rgba" "none"
+        set_ini_value "$file" "Settings" "gtk-font-name" "$HONEY_UI_FONT"
     done
 }
 
@@ -347,10 +350,19 @@ apply_xsettingsd_config() {
 }
 
 apply_kde_config() {
+    local key current promoted
+
     remember_original "$KDE_GLOBALS" "kdeglobals"
     set_ini_value "$KDE_GLOBALS" "General" "XftAntialias" "true"
     set_ini_value "$KDE_GLOBALS" "General" "XftHintStyle" "$HONEY_HINTSTYLE"
     set_ini_value "$KDE_GLOBALS" "General" "XftSubPixel" "none"
+
+    for key in fixed font smallestReadableFont toolBarFont; do
+        current="$(print_ini_value "$KDE_GLOBALS" "General" "$key")"
+        [[ "$current" == "unset" ]] && continue
+        promoted="$(printf '%s\n' "$current" | awk -F, -v weight="$HONEY_KDE_FONT_WEIGHT" 'BEGIN { OFS="," } NF >= 5 { if (($5 + 0) < (weight + 0)) $5 = weight } { print }')"
+        set_ini_value "$KDE_GLOBALS" "General" "$key" "$promoted"
+    done
 }
 
 should_apply_flags_file() {
@@ -675,6 +687,7 @@ status() {
     printf 'GTK4 hintstyle -> %s\n' "$(print_ini_value "$GTK4_SETTINGS" "Settings" "gtk-xft-hintstyle")"
     printf 'xsettingsd hintstyle -> %s\n' "$(print_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle")"
     printf 'KDE XftHintStyle -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "XftHintStyle")"
+    printf 'KDE font -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "font")"
     printf 'Legacy Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
     printf 'Codium desktop -> %s\n' "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")"
 }

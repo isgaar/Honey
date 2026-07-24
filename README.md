@@ -11,6 +11,8 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 
 - Activa antialiasing.
 - Usa hinting medio para dar un poco más de cuerpo sin forzar negrita global.
+- Usa Inter Medium solo en la interfaz GTK/Firefox para conservar un trazo geométrico.
+- Eleva a 500 las fuentes base de KDE sin alterar sus pesos semibold/bold.
 - Prefiere render grayscale en lugar de subpixel RGB.
 - Desactiva bitmaps incrustados para fuentes escalables.
 - Define una prioridad razonable de fuentes sans, serif, mono y emoji.

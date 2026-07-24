@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.7
+
+- Eleva a 500 el peso base de las fuentes KDE para dar más cuerpo a Dolphin y sus diálogos.
+- Conserva pesos KDE semibold/bold existentes y mantiene GTK/Firefox separado.
+
+## 0.4.6
+
+- Usa Inter Medium únicamente en la interfaz GTK/Firefox para un trazo geométrico más visible.
+- Mantiene la fuente KDE y el contenido web en sus pesos normales.
+- Conserva hinting medio y antialiasing en escala de grises.
+
 ## 0.4.5
 
 - Usa hinting medio como ajuste sutil de grosor sin forzar Inter Medium ni pesos KDE globales.
