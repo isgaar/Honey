@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Mueve el ajuste de Firefox a `userChrome.css`, limitado a su interfaz, con peso semibold 600.
+- Retira por completo el override de páginas web y la regla específica de Gemini.
+- Conserva iconos y SVG sin alterar.
+
 ## 0.4.9
 
 - Refuerza el texto anidado de `gemini.google.com` con peso 500 y trazo 0.16 px.

@@ -30,17 +30,11 @@ Honey usa `hintmedium`:
 </edit>
 ```
 
-### Contenido web de Firefox
+### Interfaz de Firefox
 
-Honey usa una hoja `userContent.css` por perfil para dar peso 500 y un trazo
-sutil al contenido de páginas `http`, `https` y `file`. La regla vive en la
-capa de contenido de Firefox, por lo que no toca la barra, las pestañas, los
-menús ni los diálogos del navegador. La fuente de la interfaz GTK permanece
-sin forzar.
-
-Para `gemini.google.com`, la hoja refuerza también los contenedores de texto
-anidados, donde la página declara fuentes ligeras propias. SVG e iconos quedan
-excluidos para conservar sus formas.
+Honey usa una hoja `userChrome.css` por perfil para dar peso semibold 600 a la interfaz
+del navegador: pestañas, barra de direcciones, barra lateral y menús. La regla
+vive en la capa chrome de Firefox y no toca las páginas web ni sus fuentes.
 
 En KDE, Honey eleva a peso 500 las fuentes base de `kdeglobals`; los pesos
 semibold y bold ya definidos se conservan.

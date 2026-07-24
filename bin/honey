@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.4.9"
+VERSION="0.5.0"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -37,7 +37,7 @@ XSETTINGSD_CONFIG="$CONFIG_HOME/xsettingsd/xsettingsd.conf"
 KDE_GLOBALS="$CONFIG_HOME/kdeglobals"
 FIREFOX_CONFIG_DIR="$HOME/.mozilla/firefox"
 FIREFOX_PROFILES_INI="$FIREFOX_CONFIG_DIR/profiles.ini"
-FIREFOX_WEB_CSS_SOURCE="$ROOT_DIR/config/firefox/userContent.css"
+FIREFOX_CHROME_CSS_SOURCE="$ROOT_DIR/config/firefox/userChrome.css"
 
 ELECTRON_FLAGS="$CONFIG_HOME/electron-flags.conf"
 CODIUM_FLAGS="$CONFIG_HOME/codium-flags.conf"
@@ -84,7 +84,7 @@ Honey no necesita sudo. Sus cambios viven en:
 
 Tambien sincroniza, con respaldo, estas capas cuando existen:
   GTK 3/4, xsettingsd, KDE/kdeglobals y entorno de sesion KDE/DBus.
-  Firefox recibe una hoja userContent.css solo para el contenido web.
+  Firefox recibe una hoja userChrome.css solo para su interfaz.
 EOF
 }
 
@@ -107,7 +107,7 @@ print_paths() {
     printf 'KDE_GLOBALS=%s\n' "$KDE_GLOBALS"
     printf 'FIREFOX_CONFIG_DIR=%s\n' "$FIREFOX_CONFIG_DIR"
     printf 'FIREFOX_PROFILES_INI=%s\n' "$FIREFOX_PROFILES_INI"
-    printf 'FIREFOX_WEB_CSS_SOURCE=%s\n' "$FIREFOX_WEB_CSS_SOURCE"
+    printf 'FIREFOX_CHROME_CSS_SOURCE=%s\n' "$FIREFOX_CHROME_CSS_SOURCE"
     printf 'CODIUM_FLAGS=%s\n' "$CODIUM_FLAGS"
     printf 'CODIUM_DESKTOP_TARGET=%s\n' "$CODIUM_DESKTOP_TARGET"
     printf 'CODIUM_HONEY_DESKTOP_TARGET=%s\n' "$CODIUM_HONEY_DESKTOP_TARGET"
@@ -441,9 +441,9 @@ firefox_profile_label() {
     printf 'firefox-%s' "$digest"
 }
 
-write_firefox_user_content() {
-    local profile="$1" label="$2" file="$1/chrome/userContent.css"
-    local original_file="$ORIGINAL_DIR/$label-userContent.css"
+write_firefox_user_chrome() {
+    local profile="$1" label="$2" file="$1/chrome/userChrome.css"
+    local original_file="$ORIGINAL_DIR/$label-userChrome.css"
 
     mkdir -p "$profile/chrome"
     if [[ -f "$original_file" ]]; then
@@ -452,7 +452,7 @@ write_firefox_user_content() {
         : > "$file"
     fi
     printf '\n' >> "$file"
-    cat "$FIREFOX_WEB_CSS_SOURCE" >> "$file"
+    cat "$FIREFOX_CHROME_CSS_SOURCE" >> "$file"
 }
 
 write_firefox_user_js() {
@@ -466,53 +466,56 @@ write_firefox_user_js() {
     fi
     cat >> "$file" <<'EOF'
 
-// Managed by Honey: enable web-content userContent.css.
+// Managed by Honey: enable browser-chrome userChrome.css.
 user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 EOF
 }
 
-apply_firefox_web_config() {
+apply_firefox_chrome_config() {
     local profile label
     local found=0
 
-    [[ -f "$FIREFOX_WEB_CSS_SOURCE" ]] || return 0
+    [[ -f "$FIREFOX_CHROME_CSS_SOURCE" ]] || return 0
     while IFS= read -r profile; do
         [[ -n "$profile" ]] || continue
         found=1
         label="$(firefox_profile_label "$profile")"
-        remember_original "$profile/chrome/userContent.css" "$label-userContent.css"
+        # Retire the previous web-content override so pages stay untouched.
+        restore_original "$profile/chrome/userContent.css" "$label-userContent.css"
+        remember_original "$profile/chrome/userChrome.css" "$label-userChrome.css"
         remember_original "$profile/user.js" "$label-user.js"
-        write_firefox_user_content "$profile" "$label"
+        write_firefox_user_chrome "$profile" "$label"
         write_firefox_user_js "$profile" "$label"
     done < <(firefox_profile_dirs)
 
     if (( found )); then
-        ok "Render web exclusivo de Firefox aplicado en sus perfiles"
+        ok "Render exclusivo de la interfaz Firefox aplicado en sus perfiles"
     else
-        warn "No encontre perfiles de Firefox; se omitio el render web exclusivo"
+        warn "No encontre perfiles de Firefox; se omitio el render de interfaz"
     fi
 }
 
-reset_firefox_web_config() {
+reset_firefox_chrome_config() {
     local profile label
 
     while IFS= read -r profile; do
         [[ -n "$profile" ]] || continue
         label="$(firefox_profile_label "$profile")"
         restore_original "$profile/chrome/userContent.css" "$label-userContent.css"
+        restore_original "$profile/chrome/userChrome.css" "$label-userChrome.css"
         restore_original "$profile/user.js" "$label-user.js"
     done < <(firefox_profile_dirs)
 }
 
-firefox_web_state() {
+firefox_chrome_state() {
     local profile file
     local found=0 active=0
 
     while IFS= read -r profile; do
         [[ -n "$profile" ]] || continue
         found=1
-        file="$profile/chrome/userContent.css"
-        if [[ -f "$file" ]] && grep -q 'Managed by Honey: Firefox web content only' "$file"; then
+        file="$profile/chrome/userChrome.css"
+        if [[ -f "$file" ]] && grep -q 'Managed by Honey: Firefox chrome only' "$file"; then
             active=$((active + 1))
         fi
     done < <(firefox_profile_dirs)
@@ -706,7 +709,7 @@ apply_compatibility() {
     apply_gtk_config
     apply_xsettingsd_config
     apply_kde_config
-    apply_firefox_web_config
+    apply_firefox_chrome_config
     apply_kde_session_environment
     restore_legacy_app_overrides
     if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
@@ -722,7 +725,7 @@ reset_compatibility() {
     restore_original "$GTK4_SETTINGS" "gtk4-settings.ini"
     restore_original "$XSETTINGSD_CONFIG" "xsettingsd.conf"
     restore_original "$KDE_GLOBALS" "kdeglobals"
-    reset_firefox_web_config
+    reset_firefox_chrome_config
     restore_original "$CODIUM_FLAGS" "codium-flags.conf"
     restore_original "$CODE_FLAGS" "code-flags.conf"
     restore_original "$VSCODE_OSS_FLAGS" "vscode-oss-flags.conf"
@@ -744,7 +747,7 @@ apply_profile() {
     refresh_cache
 
     ok "Perfil Honey aplicado en $PROFILE_TARGET"
-    warn "Reabre Firefox para cargar el render web; las reglas no afectan su interfaz"
+    warn "Reabre Firefox para cargar el render de interfaz; las páginas quedan sin reglas Honey"
 }
 
 reset_profile() {
@@ -873,7 +876,7 @@ status() {
     printf 'xsettingsd hintstyle -> %s\n' "$(print_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle")"
     printf 'KDE XftHintStyle -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "XftHintStyle")"
     printf 'KDE font -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "font")"
-    printf 'Firefox web content -> %s\n' "$(firefox_web_state)"
+    printf 'Firefox chrome -> %s\n' "$(firefox_chrome_state)"
     printf 'Legacy Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
     printf 'Codium desktop -> %s\n' "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")"
 }

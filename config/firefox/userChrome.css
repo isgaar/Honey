@@ -1,0 +1,37 @@
+/* Managed by Honey: Firefox chrome only. */
+/* This file styles browser controls, never web documents. */
+
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+:root,
+#navigator-toolbox,
+#sidebar-box,
+#sidebar,
+#browser-bottombox {
+  font-family: "Inter SemiBold", "Inter Medium", "Inter", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* Firefox's chrome contains nested XUL/HTML controls with their own defaults. */
+:root *:not(image):not(svg):not(path):not(.toolbarbutton-icon):not(.tab-icon-image) {
+  font-family: "Inter SemiBold", "Inter Medium", "Inter", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+#navigator-toolbox :is(label, button, input, textbox, .tab-label, .toolbarbutton-text,
+  .menu-text, .menuitem-text, .urlbar-input, #urlbar-input, #searchbar-input),
+#sidebar-box :is(label, button, input, textbox, treechildren, .sidebar-placesTreechildren),
+#sidebar :is(label, button, input, textbox, treechildren) {
+  font-family: "Inter SemiBold", "Inter Medium", "Inter", sans-serif !important;
+  font-weight: 600 !important;
+}
+
+/* Keep pictograms and image-backed controls untouched. */
+.toolbarbutton-icon,
+.tab-icon-image,
+image,
+svg,
+svg * {
+  font-family: revert !important;
+  font-weight: revert !important;
+}

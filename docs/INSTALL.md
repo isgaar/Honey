@@ -73,8 +73,8 @@ $HOME/.config/fontconfig/conf.d/99-honey.conf
 ```
 
 Tambien sincronizara, con respaldos, configuraciones de GTK, KDE, xsettingsd y
-Electron/Codium cuando existan. En Firefox instala una hoja `userContent.css`
-limitada al contenido de páginas, sin cambiar la interfaz del navegador. En
+Electron/Codium cuando existan. En Firefox instala una hoja `userChrome.css`
+limitada a la interfaz, sin cambiar el render de las páginas. En
 KDE instala una capa de sesión para que el menú y otros lanzadores hereden
 Honey. Si detecta VSCodium, adapta de forma reversible su lanzador KDE para
 cubrir instalaciones locales que omiten el entorno de sesión.
