@@ -11,7 +11,7 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 
 - Activa antialiasing.
 - Usa hinting medio para dar un poco más de cuerpo sin forzar negrita global.
-- Usa Inter Medium solo en la interfaz GTK/Firefox para conservar un trazo geométrico.
+- Aplica Inter Medium únicamente al contenido web de Firefox, sin modificar su interfaz.
 - Eleva a 500 las fuentes base de KDE sin alterar sus pesos semibold/bold.
 - Prefiere render grayscale en lugar de subpixel RGB.
 - Desactiva bitmaps incrustados para fuentes escalables.
@@ -119,6 +119,8 @@ $HOME/.config/gtk-4.0/settings.ini
 $HOME/.config/xsettingsd/xsettingsd.conf
 $HOME/.config/kdeglobals
 $HOME/.config/codium-flags.conf
+$HOME/.mozilla/firefox/<perfil>/chrome/userContent.css
+$HOME/.mozilla/firefox/<perfil>/user.js
 $HOME/.config/environment.d/90-honey.conf
 $HOME/.config/plasma-workspace/env/90-honey.sh
 ```
@@ -132,7 +134,9 @@ app o toolkit necesite configuración adicional.
 
 En KDE, Honey alinea `XftAntialias`, `XftHintStyle` y `XftSubPixel` dentro de
 `kdeglobals`. En GTK, alinea `gtk-xft-antialias`, `gtk-xft-hinting`,
-`gtk-xft-hintstyle` y `gtk-xft-rgba`.
+`gtk-xft-hintstyle` y `gtk-xft-rgba`. En Firefox, agrega una hoja
+`userContent.css` limitada a documentos web; no cambia la barra, pestañas ni
+menús del navegador.
 
 ## VSCodium y Electron
 

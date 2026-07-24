@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.4.7"
+VERSION="0.4.8"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -29,13 +29,15 @@ HONEY_ENVIRONMENT_TARGET="$ENVIRONMENT_DIR/90-honey.conf"
 HONEY_PLASMA_ENV_TARGET="$PLASMA_ENV_DIR/90-honey.sh"
 HONEY_ACTIVE_VALUE="1"
 HONEY_HINTSTYLE="hintmedium"
-HONEY_UI_FONT="Inter Medium 10.5"
 HONEY_KDE_FONT_WEIGHT="500"
 HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40"
 GTK3_SETTINGS="$CONFIG_HOME/gtk-3.0/settings.ini"
 GTK4_SETTINGS="$CONFIG_HOME/gtk-4.0/settings.ini"
 XSETTINGSD_CONFIG="$CONFIG_HOME/xsettingsd/xsettingsd.conf"
 KDE_GLOBALS="$CONFIG_HOME/kdeglobals"
+FIREFOX_CONFIG_DIR="$HOME/.mozilla/firefox"
+FIREFOX_PROFILES_INI="$FIREFOX_CONFIG_DIR/profiles.ini"
+FIREFOX_WEB_CSS_SOURCE="$ROOT_DIR/config/firefox/userContent.css"
 
 ELECTRON_FLAGS="$CONFIG_HOME/electron-flags.conf"
 CODIUM_FLAGS="$CONFIG_HOME/codium-flags.conf"
@@ -82,6 +84,7 @@ Honey no necesita sudo. Sus cambios viven en:
 
 Tambien sincroniza, con respaldo, estas capas cuando existen:
   GTK 3/4, xsettingsd, KDE/kdeglobals y entorno de sesion KDE/DBus.
+  Firefox recibe una hoja userContent.css solo para el contenido web.
 EOF
 }
 
@@ -102,6 +105,9 @@ print_paths() {
     printf 'GTK4_SETTINGS=%s\n' "$GTK4_SETTINGS"
     printf 'XSETTINGSD_CONFIG=%s\n' "$XSETTINGSD_CONFIG"
     printf 'KDE_GLOBALS=%s\n' "$KDE_GLOBALS"
+    printf 'FIREFOX_CONFIG_DIR=%s\n' "$FIREFOX_CONFIG_DIR"
+    printf 'FIREFOX_PROFILES_INI=%s\n' "$FIREFOX_PROFILES_INI"
+    printf 'FIREFOX_WEB_CSS_SOURCE=%s\n' "$FIREFOX_WEB_CSS_SOURCE"
     printf 'CODIUM_FLAGS=%s\n' "$CODIUM_FLAGS"
     printf 'CODIUM_DESKTOP_TARGET=%s\n' "$CODIUM_DESKTOP_TARGET"
     printf 'CODIUM_HONEY_DESKTOP_TARGET=%s\n' "$CODIUM_HONEY_DESKTOP_TARGET"
@@ -284,6 +290,34 @@ set_ini_value() {
     mv -f "$tmp" "$file"
 }
 
+remove_ini_value_if_equals() {
+    local file="$1" section="$2" key="$3" expected="$4"
+    local tmp
+
+    [[ -f "$file" ]] || return 0
+    tmp="$(mktemp "$STATE_DIR/honey-ini-remove.XXXXXX")"
+    awk -F= -v section="$section" -v key="$key" -v expected="$expected" '
+        BEGIN {
+            in_section = 0
+        }
+        /^\[[^]]+\][[:space:]]*$/ {
+            current = $0
+            gsub(/^\[/, "", current)
+            gsub(/\][[:space:]]*$/, "", current)
+            in_section = (current == section)
+            print
+            next
+        }
+        {
+            if (in_section && $1 == key && $2 == expected) {
+                next
+            }
+            print
+        }
+    ' "$file" > "$tmp"
+    mv -f "$tmp" "$file"
+}
+
 set_xsettings_value() {
     local file="$1" key="$2" value="$3"
     local tmp
@@ -337,8 +371,157 @@ apply_gtk_config() {
         set_ini_value "$file" "Settings" "gtk-xft-hinting" "1"
         set_ini_value "$file" "Settings" "gtk-xft-hintstyle" "$HONEY_HINTSTYLE"
         set_ini_value "$file" "Settings" "gtk-xft-rgba" "none"
-        set_ini_value "$file" "Settings" "gtk-font-name" "$HONEY_UI_FONT"
+        if [[ -f "$ORIGINAL_DIR/$label.missing" ]]; then
+            remove_ini_value_if_equals "$file" "Settings" "gtk-font-name" "Inter Medium 10.5"
+        fi
     done
+}
+
+firefox_profile_dirs() {
+    if [[ -f "$FIREFOX_PROFILES_INI" ]]; then
+        awk -F= -v root="$FIREFOX_CONFIG_DIR" '
+            function emit() {
+                if (path == "") {
+                    return
+                }
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", path)
+                if (relative == "1") {
+                    print root "/" path
+                } else {
+                    print path
+                }
+            }
+            /^\[Profile[0-9]+\][[:space:]]*$/ {
+                if (in_profile) {
+                    emit()
+                }
+                path = ""
+                relative = "1"
+                in_profile = 1
+                next
+            }
+            /^\[/ {
+                if (in_profile) {
+                    emit()
+                }
+                path = ""
+                in_profile = 0
+                next
+            }
+            in_profile && $1 == "Path" {
+                path = $2
+                next
+            }
+            in_profile && $1 == "IsRelative" {
+                relative = $2
+                next
+            }
+            END {
+                if (in_profile) {
+                    emit()
+                }
+            }
+        ' "$FIREFOX_PROFILES_INI"
+    elif [[ -d "$FIREFOX_CONFIG_DIR" ]]; then
+        find "$FIREFOX_CONFIG_DIR" -mindepth 2 -maxdepth 2 -type f -name prefs.js -printf '%h\n'
+    fi | while IFS= read -r profile; do
+        [[ -f "$profile/prefs.js" ]] && printf '%s\n' "$profile"
+    done | sort -u
+}
+
+firefox_profile_label() {
+    local profile="$1"
+    local digest
+
+    if command_exists sha256sum; then
+        digest="$(printf '%s' "$profile" | sha256sum | awk '{ print substr($1, 1, 16) }')"
+    else
+        digest="$(printf '%s' "$profile" | cksum | awk '{ print $1 }')"
+    fi
+    printf 'firefox-%s' "$digest"
+}
+
+write_firefox_user_content() {
+    local profile="$1" label="$2" file="$1/chrome/userContent.css"
+    local original_file="$ORIGINAL_DIR/$label-userContent.css"
+
+    mkdir -p "$profile/chrome"
+    if [[ -f "$original_file" ]]; then
+        cp -f "$original_file" "$file"
+    else
+        : > "$file"
+    fi
+    printf '\n' >> "$file"
+    cat "$FIREFOX_WEB_CSS_SOURCE" >> "$file"
+}
+
+write_firefox_user_js() {
+    local profile="$1" label="$2" file="$profile/user.js"
+    local original_file="$ORIGINAL_DIR/$label-user.js"
+
+    if [[ -f "$original_file" ]]; then
+        cp -f "$original_file" "$file"
+    else
+        : > "$file"
+    fi
+    cat >> "$file" <<'EOF'
+
+// Managed by Honey: enable web-content userContent.css.
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
+EOF
+}
+
+apply_firefox_web_config() {
+    local profile label
+    local found=0
+
+    [[ -f "$FIREFOX_WEB_CSS_SOURCE" ]] || return 0
+    while IFS= read -r profile; do
+        [[ -n "$profile" ]] || continue
+        found=1
+        label="$(firefox_profile_label "$profile")"
+        remember_original "$profile/chrome/userContent.css" "$label-userContent.css"
+        remember_original "$profile/user.js" "$label-user.js"
+        write_firefox_user_content "$profile" "$label"
+        write_firefox_user_js "$profile" "$label"
+    done < <(firefox_profile_dirs)
+
+    if (( found )); then
+        ok "Render web exclusivo de Firefox aplicado en sus perfiles"
+    else
+        warn "No encontre perfiles de Firefox; se omitio el render web exclusivo"
+    fi
+}
+
+reset_firefox_web_config() {
+    local profile label
+
+    while IFS= read -r profile; do
+        [[ -n "$profile" ]] || continue
+        label="$(firefox_profile_label "$profile")"
+        restore_original "$profile/chrome/userContent.css" "$label-userContent.css"
+        restore_original "$profile/user.js" "$label-user.js"
+    done < <(firefox_profile_dirs)
+}
+
+firefox_web_state() {
+    local profile file
+    local found=0 active=0
+
+    while IFS= read -r profile; do
+        [[ -n "$profile" ]] || continue
+        found=1
+        file="$profile/chrome/userContent.css"
+        if [[ -f "$file" ]] && grep -q 'Managed by Honey: Firefox web content only' "$file"; then
+            active=$((active + 1))
+        fi
+    done < <(firefox_profile_dirs)
+
+    if (( found == 0 )); then
+        printf 'sin perfiles'
+    else
+        printf '%s/%s perfiles activos' "$active" "$found"
+    fi
 }
 
 apply_xsettingsd_config() {
@@ -523,6 +706,7 @@ apply_compatibility() {
     apply_gtk_config
     apply_xsettingsd_config
     apply_kde_config
+    apply_firefox_web_config
     apply_kde_session_environment
     restore_legacy_app_overrides
     if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
@@ -538,6 +722,7 @@ reset_compatibility() {
     restore_original "$GTK4_SETTINGS" "gtk4-settings.ini"
     restore_original "$XSETTINGSD_CONFIG" "xsettingsd.conf"
     restore_original "$KDE_GLOBALS" "kdeglobals"
+    reset_firefox_web_config
     restore_original "$CODIUM_FLAGS" "codium-flags.conf"
     restore_original "$CODE_FLAGS" "code-flags.conf"
     restore_original "$VSCODE_OSS_FLAGS" "vscode-oss-flags.conf"
@@ -559,7 +744,7 @@ apply_profile() {
     refresh_cache
 
     ok "Perfil Honey aplicado en $PROFILE_TARGET"
-    warn "Reabre VSCodium, apps KDE y apps GTK para ver el cambio completo"
+    warn "Reabre Firefox para cargar el render web; las reglas no afectan su interfaz"
 }
 
 reset_profile() {
@@ -688,6 +873,7 @@ status() {
     printf 'xsettingsd hintstyle -> %s\n' "$(print_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle")"
     printf 'KDE XftHintStyle -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "XftHintStyle")"
     printf 'KDE font -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "font")"
+    printf 'Firefox web content -> %s\n' "$(firefox_web_state)"
     printf 'Legacy Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
     printf 'Codium desktop -> %s\n' "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")"
 }
@@ -702,6 +888,7 @@ doctor() {
     if command_exists fc-match; then ok "fc-match encontrado"; else warn "fc-match no encontrado"; fi
     if [[ -f "$PROFILE_SOURCE" ]]; then ok "perfil fuente encontrado"; else die "perfil fuente no encontrado"; fi
     if [[ -e "$KDE_GLOBALS" ]]; then ok "kdeglobals encontrado"; else warn "kdeglobals no encontrado"; fi
+    if [[ -d "$FIREFOX_CONFIG_DIR" ]]; then ok "perfiles de Firefox encontrados"; else warn "perfiles de Firefox no encontrados"; fi
     if [[ -e "$GTK3_SETTINGS" ]]; then ok "GTK3 settings encontrado"; else warn "GTK3 settings no encontrado"; fi
     if [[ -e "$GTK4_SETTINGS" ]]; then ok "GTK4 settings encontrado"; else warn "GTK4 settings no encontrado"; fi
     if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then

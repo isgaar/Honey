@@ -13,6 +13,8 @@ Honey/
   config/
     fontconfig/
       99-honey.conf
+    firefox/
+      userContent.css
   docs/
     INSTALL.md
     USAGE.md
@@ -43,6 +45,12 @@ compatibilidad GTK/KDE/Electron y entorno de sesión KDE/DBus.
 
 Perfil real que se copia a `~/.config/fontconfig/conf.d/99-honey.conf` cuando se
 ejecuta `honey apply`.
+
+`config/firefox/userContent.css`
+
+Hoja cargada por los perfiles Firefox detectados. Solo afecta documentos web;
+`bin/honey` la respalda y la instala en `chrome/userContent.css` junto con la
+preferencia que habilita personalizaciones del perfil.
 
 `docs/RENDERING.md`
 

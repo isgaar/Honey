@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.8
+
+- Retira el peso Inter Medium de la interfaz GTK para no engrosar el navegador.
+- Añade `userContent.css` de Firefox con peso 500 y un trazo sutil solo para páginas web.
+- Habilita la hoja por perfil y restaura los archivos originales con `honey reset`.
+
 ## 0.4.7
 
 - Eleva a 500 el peso base de las fuentes KDE para dar más cuerpo a Dolphin y sus diálogos.

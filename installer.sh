@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 
 APP_NAME="Honey"
-APP_VERSION="0.4.7"
+APP_VERSION="0.4.8"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX="${HONEY_PREFIX:-$HOME/.local}"
 INSTALL_DIR="${HONEY_HOME:-$HOME/.local/share/honey}"

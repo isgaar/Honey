@@ -61,6 +61,18 @@ fc-match monospace
 Despues reabre las aplicaciones. Algunas leen configuracion de fuentes solo al
 arrancar.
 
+## Firefox no refleja el render de la página
+
+Comprueba que el perfil web esté activo:
+
+```bash
+honey status
+```
+
+Debe mostrar `Firefox web content -> 1/1 perfiles activos` (o el número de
+perfiles que uses). Cierra y vuelve a abrir Firefox: `userContent.css` se lee al
+arrancar y solo afecta la página, no la barra ni las pestañas.
+
 ## Una app lanzada por KDE se ve igual
 
 Primero revisa que la capa de sesión exista:
