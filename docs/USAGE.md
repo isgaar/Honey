@@ -28,12 +28,13 @@ Este comando:
 - alinea GTK 3, GTK 4, xsettingsd y KDE;
 - instala una capa de sesión para KDE con `environment.d` y `plasma-workspace/env`;
 - importa el entorno Honey a systemd user y DBus cuando la sesión lo permite;
+- adapta con respaldo el lanzador KDE de VSCodium cuando existe;
 - regenera cache con `fc-cache` cuando esta disponible.
 
 ## Sesión KDE
 
-Honey evita modificar aplicación por aplicación. En KDE, la ruta estable es que
-las apps lanzadas desde el menú hereden variables de sesión:
+En KDE, la ruta estable es que las apps lanzadas desde el menú hereden
+variables de sesión:
 
 ```text
 HONEY_ACTIVE=1
@@ -47,6 +48,10 @@ Honey escribe esas variables en:
 ~/.config/environment.d/90-honey.conf
 ~/.config/plasma-workspace/env/90-honey.sh
 ```
+
+Algunas instalaciones locales de VSCodium usan un lanzador que no conserva ese
+entorno. Honey crea un override KDE gestionado y guarda el original antes de
+redirigirlo por `honey launch-codium`.
 
 ## Diagnóstico con VSCodium
 

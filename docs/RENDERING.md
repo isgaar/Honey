@@ -20,15 +20,21 @@ Honey activa antialiasing:
 
 Esto suaviza bordes y evita que las letras se vean cortadas o escalonadas.
 
-### Hinting ligero
+### Hinting medio
 
-Honey usa `hintslight`:
+Honey usa `hintmedium`:
 
 ```xml
 <edit name="hintstyle" mode="assign">
-  <const>hintslight</const>
+  <const>hintmedium</const>
 </edit>
 ```
+
+### Peso de interfaz
+
+Para que el resultado sea visible en tamaños pequeños, Honey usa `Inter Medium`
+como peso base en GTK y eleva a 500 los pesos KDE que eran regulares. Los pesos
+explícitos semibold/bold se conservan.
 
 La intencion es conservar la forma natural de la fuente sin forzar demasiado la
 grilla de pixeles.
@@ -100,13 +106,14 @@ GTK:
 
 - `gtk-xft-antialias=1`
 - `gtk-xft-hinting=1`
-- `gtk-xft-hintstyle=hintslight`
+- `gtk-xft-hintstyle=hintmedium`
 - `gtk-xft-rgba=none`
+- `gtk-font-name=Inter Medium 10.5`
 
 KDE:
 
 - `XftAntialias=true`
-- `XftHintStyle=hintslight`
+- `XftHintStyle=hintmedium`
 - `XftSubPixel=none`
 
 Sesión KDE:

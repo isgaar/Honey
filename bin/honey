@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.4.0"
+VERSION="0.4.3"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -28,6 +28,8 @@ PLASMA_ENV_DIR="$CONFIG_HOME/plasma-workspace/env"
 HONEY_ENVIRONMENT_TARGET="$ENVIRONMENT_DIR/90-honey.conf"
 HONEY_PLASMA_ENV_TARGET="$PLASMA_ENV_DIR/90-honey.sh"
 HONEY_ACTIVE_VALUE="1"
+HONEY_HINTSTYLE="hintmedium"
+HONEY_UI_FONT="Inter Medium 10.5"
 HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40"
 GTK3_SETTINGS="$CONFIG_HOME/gtk-3.0/settings.ini"
 GTK4_SETTINGS="$CONFIG_HOME/gtk-4.0/settings.ini"
@@ -48,7 +50,7 @@ CODIUM_HONEY_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-honey.desktop"
 CODIUM_HONEY_USER_DATA_DIR="$CONFIG_HOME/VSCodium-Honey"
 CODIUM_HONEY_EXTENSIONS_DIR="$DATA_HOME/honey/codium/extensions"
 CODIUM_WRAPPER="/usr/bin/codium"
-HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=slight)
+HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=medium)
 
 green='\033[0;32m'
 yellow='\033[1;33m'
@@ -332,8 +334,9 @@ apply_gtk_config() {
         remember_original "$file" "$label"
         set_ini_value "$file" "Settings" "gtk-xft-antialias" "1"
         set_ini_value "$file" "Settings" "gtk-xft-hinting" "1"
-        set_ini_value "$file" "Settings" "gtk-xft-hintstyle" "hintslight"
+        set_ini_value "$file" "Settings" "gtk-xft-hintstyle" "$HONEY_HINTSTYLE"
         set_ini_value "$file" "Settings" "gtk-xft-rgba" "none"
+        set_ini_value "$file" "Settings" "gtk-font-name" "$HONEY_UI_FONT"
     done
 }
 
@@ -341,15 +344,24 @@ apply_xsettingsd_config() {
     remember_original "$XSETTINGSD_CONFIG" "xsettingsd.conf"
     set_xsettings_value "$XSETTINGSD_CONFIG" "Xft/Antialias" "1"
     set_xsettings_value "$XSETTINGSD_CONFIG" "Xft/Hinting" "1"
-    set_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle" "\"hintslight\""
+    set_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle" "\"$HONEY_HINTSTYLE\""
     set_xsettings_value "$XSETTINGSD_CONFIG" "Xft/RGBA" "\"none\""
 }
 
 apply_kde_config() {
+    local key current promoted
+
     remember_original "$KDE_GLOBALS" "kdeglobals"
     set_ini_value "$KDE_GLOBALS" "General" "XftAntialias" "true"
-    set_ini_value "$KDE_GLOBALS" "General" "XftHintStyle" "hintslight"
+    set_ini_value "$KDE_GLOBALS" "General" "XftHintStyle" "$HONEY_HINTSTYLE"
     set_ini_value "$KDE_GLOBALS" "General" "XftSubPixel" "none"
+
+    for key in fixed font smallestReadableFont toolBarFont; do
+        current="$(print_ini_value "$KDE_GLOBALS" "General" "$key")"
+        [[ "$current" == "unset" ]] && continue
+        promoted="$(printf '%s\n' "$current" | awk -F, 'BEGIN { OFS="," } NF >= 5 { if (($5 + 0) < 500) $5 = 500 } { print }')"
+        set_ini_value "$KDE_GLOBALS" "General" "$key" "$promoted"
+    done
 }
 
 should_apply_flags_file() {
@@ -382,24 +394,55 @@ apply_electron_flags() {
         should_apply_flags_file "$file" || continue
         label="$(basename "$file")"
         remember_original "$file" "$label"
-        ensure_flag "$file" "^--font-render-hinting=" "--font-render-hinting=slight"
+        ensure_flag "$file" "^--font-render-hinting=" "--font-render-hinting=medium"
         ensure_flag "$file" "^--disable-lcd-text$" "--disable-lcd-text"
     done
 }
 
 patch_codium_desktop_file() {
     local source="$1" target="$2" label="$3"
-    local tmp
+    local tmp honey_cli
 
     [[ -f "$source" ]] || return 0
 
     mkdir -p "$LOCAL_APPLICATIONS_DIR" "$STATE_DIR"
     remember_original "$target" "$label"
     tmp="$(mktemp "$STATE_DIR/honey-desktop.XXXXXX")"
+    honey_cli="$ROOT_DIR/bin/honey"
 
-    awk '
-        /^Exec=\/usr\/share\/codium\/codium/ {
-            sub(/^Exec=\/usr\/share\/codium\/codium/, "Exec=/usr/bin/codium --disable-lcd-text --font-render-hinting=slight")
+    awk -v honey_cli="$honey_cli" '
+        BEGIN {
+            print "# Managed by Honey"
+        }
+        /^#[[:space:]]*Managed by Honey[[:space:]]*$/ {
+            next
+        }
+        /^Exec=/ {
+            command_line = substr($0, 6)
+            sub(/^[[:space:]]*/, "", command_line)
+
+            if (substr(command_line, 1, 1) == "\"") {
+                command_line = substr(command_line, 2)
+                closing_quote = index(command_line, "\"")
+                if (closing_quote > 0) {
+                    command_line = substr(command_line, closing_quote + 1)
+                } else {
+                    command_line = ""
+                }
+            } else {
+                sub(/^[^[:space:]]+/, "", command_line)
+            }
+
+            sub(/^[[:space:]]*/, "", command_line)
+            printf "Exec=\"%s\" launch-codium", honey_cli
+            if (command_line != "") {
+                printf " %s", command_line
+            }
+            if (command_line !~ /%[fFuU]/) {
+                printf " %%F"
+            }
+            printf "\n"
+            next
         }
         { print }
     ' "$source" > "$tmp"
@@ -416,7 +459,7 @@ write_codium_honey_desktop_file() {
 Name=VSCodium Honey
 Comment=VSCodium isolated Honey render instance
 GenericName=Text Editor
-Exec=/usr/bin/codium --user-data-dir $CODIUM_HONEY_USER_DATA_DIR --extensions-dir $CODIUM_HONEY_EXTENSIONS_DIR --disable-lcd-text --font-render-hinting=slight %F
+Exec="$ROOT_DIR/bin/honey" launch-honey-codium %F
 Icon=vscodium
 Type=Application
 StartupNotify=false
@@ -429,7 +472,7 @@ Keywords=honey;vscodium;codium;vscode;
 [Desktop Action new-empty-window]
 Name=New Honey Window
 Name[es]=Nueva ventana Honey
-Exec=/usr/bin/codium --user-data-dir $CODIUM_HONEY_USER_DATA_DIR --extensions-dir $CODIUM_HONEY_EXTENSIONS_DIR --disable-lcd-text --font-render-hinting=slight --new-window %F
+Exec="$ROOT_DIR/bin/honey" launch-honey-codium --new-window %F
 Icon=vscodium
 EOF
 }
@@ -447,8 +490,19 @@ refresh_desktop_launchers() {
 }
 
 apply_codium_launchers() {
-    patch_codium_desktop_file "$CODIUM_DESKTOP_SOURCE" "$CODIUM_DESKTOP_TARGET" "codium.desktop"
-    patch_codium_desktop_file "$CODIUM_URL_DESKTOP_SOURCE" "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
+    local desktop_source="$CODIUM_DESKTOP_SOURCE"
+    local url_desktop_source="$CODIUM_URL_DESKTOP_SOURCE"
+
+    if [[ -f "$CODIUM_DESKTOP_TARGET" ]]; then
+        desktop_source="$CODIUM_DESKTOP_TARGET"
+    fi
+
+    if [[ -f "$CODIUM_URL_DESKTOP_TARGET" ]]; then
+        url_desktop_source="$CODIUM_URL_DESKTOP_TARGET"
+    fi
+
+    patch_codium_desktop_file "$desktop_source" "$CODIUM_DESKTOP_TARGET" "codium.desktop"
+    patch_codium_desktop_file "$url_desktop_source" "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
     write_codium_honey_desktop_file
     refresh_desktop_launchers
 }
@@ -470,6 +524,9 @@ apply_compatibility() {
     apply_kde_config
     apply_kde_session_environment
     restore_legacy_app_overrides
+    if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
+        apply_codium_launchers
+    fi
     ok "Compatibilidad GTK/KDE/Electron aplicada desde la sesion"
 }
 
@@ -626,10 +683,14 @@ status() {
     printf 'Honey FREETYPE target -> %s\n' "$HONEY_FREETYPE_PROPERTIES"
     printf 'Current process FREETYPE -> %s\n' "${FREETYPE_PROPERTIES:-unset}"
     printf 'GTK3 hintstyle -> %s\n' "$(print_ini_value "$GTK3_SETTINGS" "Settings" "gtk-xft-hintstyle")"
+    printf 'GTK3 font -> %s\n' "$(print_ini_value "$GTK3_SETTINGS" "Settings" "gtk-font-name")"
     printf 'GTK4 hintstyle -> %s\n' "$(print_ini_value "$GTK4_SETTINGS" "Settings" "gtk-xft-hintstyle")"
+    printf 'GTK4 font -> %s\n' "$(print_ini_value "$GTK4_SETTINGS" "Settings" "gtk-font-name")"
     printf 'xsettingsd hintstyle -> %s\n' "$(print_xsettings_value "$XSETTINGSD_CONFIG" "Xft/HintStyle")"
     printf 'KDE XftHintStyle -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "XftHintStyle")"
+    printf 'KDE font -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "font")"
     printf 'Legacy Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
+    printf 'Codium desktop -> %s\n' "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")"
 }
 
 doctor() {
@@ -644,7 +705,16 @@ doctor() {
     if [[ -e "$KDE_GLOBALS" ]]; then ok "kdeglobals encontrado"; else warn "kdeglobals no encontrado"; fi
     if [[ -e "$GTK3_SETTINGS" ]]; then ok "GTK3 settings encontrado"; else warn "GTK3 settings no encontrado"; fi
     if [[ -e "$GTK4_SETTINGS" ]]; then ok "GTK4 settings encontrado"; else warn "GTK4 settings no encontrado"; fi
-    if [[ -e "$CODIUM_FLAGS" ]]; then ok "codium-flags encontrado"; else warn "codium-flags no encontrado"; fi
+    if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
+        ok "VSCodium encontrado"
+    else
+        warn "VSCodium no encontrado; se omite su lanzador especializado"
+    fi
+    if [[ "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")" == "active" ]]; then
+        ok "launcher KDE de VSCodium gestionado por Honey"
+    else
+        warn "launcher KDE de VSCodium no gestionado por Honey"
+    fi
     if [[ -f "$HONEY_ENVIRONMENT_TARGET" ]]; then ok "environment.d Honey encontrado"; else warn "environment.d Honey no encontrado"; fi
     if [[ -f "$HONEY_PLASMA_ENV_TARGET" ]]; then ok "hook Plasma Honey encontrado"; else warn "hook Plasma Honey no encontrado"; fi
     if [[ -d "$(dirname "$PROFILE_TARGET")" || -w "${XDG_CONFIG_HOME:-$HOME/.config}" ]]; then
@@ -654,28 +724,45 @@ doctor() {
     fi
 }
 
-launch_codium() {
-    local bin="$CODIUM_WRAPPER"
+prepare_launch_environment() {
+    export HONEY_ACTIVE="$HONEY_ACTIVE_VALUE"
+    export HONEY_FONTCONFIG="$PROFILE_TARGET"
+    export FREETYPE_PROPERTIES="$HONEY_FREETYPE_PROPERTIES"
+}
 
-    if [[ ! -x "$bin" ]]; then
-        bin="$(command -v codium || true)"
+resolve_codium_bin() {
+    local bin=""
+
+    if command_exists codium; then
+        bin="$(command -v codium)"
+    elif command_exists vscodium; then
+        bin="$(command -v vscodium)"
+    elif [[ -x "$CODIUM_WRAPPER" ]]; then
+        bin="$CODIUM_WRAPPER"
     fi
 
+    [[ -n "$bin" ]] || return 1
+    printf '%s\n' "$bin"
+}
+
+launch_codium() {
+    local bin
+
+    bin="$(resolve_codium_bin || true)"
     [[ -n "$bin" ]] || die "No encontre codium"
 
+    prepare_launch_environment
     "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
 }
 
 launch_honey_codium() {
-    local bin="$CODIUM_WRAPPER"
+    local bin
 
-    if [[ ! -x "$bin" ]]; then
-        bin="$(command -v codium || true)"
-    fi
-
+    bin="$(resolve_codium_bin || true)"
     [[ -n "$bin" ]] || die "No encontre codium"
     mkdir -p "$CODIUM_HONEY_USER_DATA_DIR" "$CODIUM_HONEY_EXTENSIONS_DIR"
 
+    prepare_launch_environment
     "$bin" \
         --user-data-dir "$CODIUM_HONEY_USER_DATA_DIR" \
         --extensions-dir "$CODIUM_HONEY_EXTENSIONS_DIR" \

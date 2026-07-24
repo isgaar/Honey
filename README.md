@@ -10,13 +10,14 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 ## Qué hace
 
 - Activa antialiasing.
-- Usa hinting ligero para evitar trazos duros.
+- Usa hinting medio para dar más cuerpo sin perder definición.
 - Prefiere render grayscale en lugar de subpixel RGB.
 - Desactiva bitmaps incrustados para fuentes escalables.
 - Define una prioridad razonable de fuentes sans, serif, mono y emoji.
 - Regenera la caché de fuentes cuando `fc-cache` está disponible.
 - Agrega una base para documentar y ampliar instrucciones orientadas a apps GTK y KDE.
 - Sincroniza GTK, KDE, DBus y systemd user para que las apps lanzadas por KDE hereden Honey.
+- Adapta el lanzador KDE de VSCodium cuando una instalación local omite el entorno de sesión.
 - Mantiene todo bajo `$HOME`, sin `sudo`.
 
 ## Qué incluye
@@ -134,9 +135,10 @@ En KDE, Honey alinea `XftAntialias`, `XftHintStyle` y `XftSubPixel` dentro de
 ## VSCodium y Electron
 
 VSCodium puede no reflejar Honey si ya estaba abierto antes de aplicar el
-perfil. Honey no intenta modificar aplicación por aplicación: instala una capa
-de sesión para KDE mediante `environment.d`, `plasma-workspace/env`, DBus y
-systemd user.
+perfil. Honey instala una capa de sesión para KDE mediante `environment.d`,
+`plasma-workspace/env`, DBus y systemd user. Si detecta VSCodium, también
+genera un override reversible de su lanzador KDE para asegurar que el proceso
+reciba el render especializado incluso con instalaciones locales en `/opt`.
 
 Después de `honey apply`, los lanzamientos nuevos de KDE deben heredar:
 

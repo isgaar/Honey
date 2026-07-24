@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.3
+
+- Usa Inter Medium como peso base de la interfaz en GTK y KDE para que el texto tenga más cuerpo.
+- Conserva pesos KDE explícitos de 500 o superiores y las negritas solicitadas por cada aplicación.
+- Expone el peso de interfaz en `honey status`.
+
+## 0.4.2
+
+- Usa hinting medio para dar más cuerpo al texto manteniendo antialiasing en escala de grises.
+- Sincroniza el mismo hintstyle en Fontconfig, GTK, xsettingsd, KDE y lanzadores Electron.
+
+## 0.4.1
+
+- Corrige lanzadores locales de VSCodium que eludian el entorno de sesión de Honey.
+- Hace que `launch-codium` y `launch-honey-codium` exporten explícitamente el perfil de render.
+- Prefiere el VSCodium visible en `PATH`, conservando compatibilidad con instalaciones en `/opt`.
+- Genera un override KDE reversible y conserva el lanzador original antes de modificarlo.
+
 ## 0.4.0
 
 - Cambia la estrategia principal a una capa de sesión KDE mediante `environment.d` y `plasma-workspace/env`.
