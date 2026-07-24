@@ -10,7 +10,7 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 ## Qué hace
 
 - Activa antialiasing.
-- Usa hinting ligero para evitar trazos duros.
+- Usa hinting medio para dar un poco más de cuerpo sin forzar negrita global.
 - Prefiere render grayscale en lugar de subpixel RGB.
 - Desactiva bitmaps incrustados para fuentes escalables.
 - Define una prioridad razonable de fuentes sans, serif, mono y emoji.

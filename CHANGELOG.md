@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.5
+
+- Usa hinting medio como ajuste sutil de grosor sin forzar Inter Medium ni pesos KDE globales.
+- Mantiene la escala de grises y los pesos explícitos de cada aplicación.
+
 ## 0.4.4
 
 - Retira el peso global Inter Medium porque endurecía demasiado la interfaz de Firefox y GTK.

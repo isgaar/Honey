@@ -20,13 +20,13 @@ Honey activa antialiasing:
 
 Esto suaviza bordes y evita que las letras se vean cortadas o escalonadas.
 
-### Hinting ligero
+### Hinting medio
 
-Honey usa `hintslight`:
+Honey usa `hintmedium`:
 
 ```xml
 <edit name="hintstyle" mode="assign">
-  <const>hintslight</const>
+  <const>hintmedium</const>
 </edit>
 ```
 
@@ -100,13 +100,13 @@ GTK:
 
 - `gtk-xft-antialias=1`
 - `gtk-xft-hinting=1`
-- `gtk-xft-hintstyle=hintslight`
+- `gtk-xft-hintstyle=hintmedium`
 - `gtk-xft-rgba=none`
 
 KDE:
 
 - `XftAntialias=true`
-- `XftHintStyle=hintslight`
+- `XftHintStyle=hintmedium`
 - `XftSubPixel=none`
 
 Sesión KDE:
