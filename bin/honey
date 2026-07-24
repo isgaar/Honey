@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.4.8"
+VERSION="0.4.9"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do

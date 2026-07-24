@@ -38,6 +38,10 @@ capa de contenido de Firefox, por lo que no toca la barra, las pestañas, los
 menús ni los diálogos del navegador. La fuente de la interfaz GTK permanece
 sin forzar.
 
+Para `gemini.google.com`, la hoja refuerza también los contenedores de texto
+anidados, donde la página declara fuentes ligeras propias. SVG e iconos quedan
+excluidos para conservar sus formas.
+
 En KDE, Honey eleva a peso 500 las fuentes base de `kdeglobals`; los pesos
 semibold y bold ya definidos se conservan.
 

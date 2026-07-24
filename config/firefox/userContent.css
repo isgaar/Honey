@@ -13,3 +13,18 @@
     -webkit-text-stroke: 0.1px currentColor;
   }
 }
+
+/* Gemini declares its own light web fonts on nested containers. Keep this
+ * correction scoped to the page, leaving Firefox chrome and other sites alone. */
+@-moz-document domain("gemini.google.com") {
+  body :not(svg):not(path):not([aria-hidden="true"]):not([role="img"]):not([class*="icon"]):not([class*="Icon"]) {
+    font-family: "Inter Medium", "Inter", sans-serif !important;
+    font-weight: 500 !important;
+    -webkit-text-stroke: 0.16px currentColor;
+  }
+
+  svg,
+  svg * {
+    -webkit-text-stroke: 0 !important;
+  }
+}

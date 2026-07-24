@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.9
+
+- Refuerza el texto anidado de `gemini.google.com` con peso 500 y trazo 0.16 px.
+- Mantiene SVG, iconos y la interfaz de Firefox fuera de la regla.
+
 ## 0.4.8
 
 - Retira el peso Inter Medium de la interfaz GTK para no engrosar el navegador.
