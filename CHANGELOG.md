@@ -1,10 +1,13 @@
 # Changelog
 
+## 0.4.4
+
+- Retira el peso global Inter Medium porque endurecía demasiado la interfaz de Firefox y GTK.
+- Vuelve a `hintslight` como valor predeterminado, conservando `rgba=none` y la capa de sesión KDE.
+
 ## 0.4.3
 
-- Usa Inter Medium como peso base de la interfaz en GTK y KDE para que el texto tenga más cuerpo.
-- Conserva pesos KDE explícitos de 500 o superiores y las negritas solicitadas por cada aplicación.
-- Expone el peso de interfaz en `honey status`.
+- Ajuste experimental de peso de interfaz, reemplazado por el perfil conservador en 0.4.4.
 
 ## 0.4.2
 
