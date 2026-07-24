@@ -29,7 +29,7 @@ Este comando:
 - instala una capa de sesión para KDE con `environment.d` y `plasma-workspace/env`;
 - importa el entorno Honey a systemd user y DBus cuando la sesión lo permite;
 - adapta con respaldo el lanzador KDE de VSCodium cuando existe;
-- habilita `userChrome.css` de Firefox solo para su interfaz, sin alterar las páginas;
+- habilita `userChrome.css` para la interfaz y un trazo web neutral sin alterar diseños;
 - regenera cache con `fc-cache` cuando esta disponible.
 
 ## Sesión KDE
@@ -81,7 +81,7 @@ Muestra:
 - donde esta el archivo aplicado;
 - que fuentes resuelve `fontconfig` para familias comunes;
 - que hinting estan usando GTK, KDE y Codium;
-- que perfiles de Firefox tienen activo el render exclusivo de su interfaz.
+- que perfiles de Firefox tienen activos los renders de interfaz y web neutral.
 - si `environment.d` y el hook de Plasma estan activos.
 
 ## Retirar el perfil
@@ -105,8 +105,8 @@ Tambien restaura las configuraciones originales que Honey guardo en:
 ~/.local/state/honey/originals
 ```
 
-Esto incluye `userChrome.css`, restos de `userContent.css` anteriores y `user.js`
-de los perfiles Firefox detectados.
+Esto incluye `userChrome.css`, `userContent.css` y `user.js` de los perfiles
+Firefox detectados.
 
 ## Diagnostico
 

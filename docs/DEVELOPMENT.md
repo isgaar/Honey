@@ -15,6 +15,7 @@ Honey/
       99-honey.conf
     firefox/
       userChrome.css
+      userContent.css
   docs/
     INSTALL.md
     USAGE.md
@@ -51,6 +52,11 @@ ejecuta `honey apply`.
 Hoja cargada por los perfiles Firefox detectados. Solo afecta la interfaz;
 `bin/honey` la respalda y la instala en `chrome/userChrome.css` junto con la
 preferencia que habilita personalizaciones del perfil.
+
+`config/firefox/userContent.css`
+
+Ajuste global de trazo para documentos web. No debe incluir familias, pesos,
+tamaños ni reglas de diseño de un sitio concreto.
 
 `docs/RENDERING.md`
 

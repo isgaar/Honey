@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Añade un trazo web neutral para todas las páginas sin modificar su diseño.
+- No fuerza familia, peso, tamaño, color, márgenes ni estilos propios del sitio.
+
 ## 0.5.0
 
 - Mueve el ajuste de Firefox a `userChrome.css`, limitado a su interfaz, con peso semibold 600.

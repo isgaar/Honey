@@ -34,7 +34,12 @@ Honey usa `hintmedium`:
 
 Honey usa una hoja `userChrome.css` por perfil para dar peso semibold 600 a la interfaz
 del navegador: pestañas, barra de direcciones, barra lateral y menús. La regla
-vive en la capa chrome de Firefox y no toca las páginas web ni sus fuentes.
+vive en la capa chrome de Firefox.
+
+Para las páginas usa una hoja `userContent.css` global que solo aplica un trazo
+de `0.1px` a los glifos. No fija familia, peso, tamaño, color, márgenes ni
+estructura, por lo que el diseño y la tipografía declarada por cada sitio se
+conservan.
 
 En KDE, Honey eleva a peso 500 las fuentes base de `kdeglobals`; los pesos
 semibold y bold ya definidos se conservan.

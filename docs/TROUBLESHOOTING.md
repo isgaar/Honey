@@ -69,9 +69,10 @@ Comprueba que el perfil web esté activo:
 honey status
 ```
 
-Debe mostrar `Firefox chrome -> 1/1 perfiles activos` (o el número de perfiles
-que uses). Cierra y vuelve a abrir Firefox: `userChrome.css` se lee al arrancar
-y solo afecta la interfaz, no las páginas.
+Debe mostrar `Firefox chrome -> 1/1 perfiles activos` y
+`Firefox web render -> 1/1 perfiles activos` (o el número de perfiles que uses).
+Cierra y vuelve a abrir Firefox: ambas hojas se leen al arrancar; la web solo
+recibe el trazo neutral, no cambios de diseño.
 
 ## Una app lanzada por KDE se ve igual
 

@@ -1,0 +1,14 @@
+/* Managed by Honey: neutral web rendering only. */
+/* No font family, weight, size, color, layout, or site-specific rules. */
+
+@-moz-document url-prefix("http://"), url-prefix("https://"), url-prefix("file://") {
+  body,
+  body *:not(svg):not(path):not(image):not([aria-hidden="true"]):not([role="img"]):not([class*="icon"]):not([class*="Icon"]) {
+    -webkit-text-stroke: 0.1px currentColor;
+  }
+
+  svg,
+  svg * {
+    -webkit-text-stroke: 0 !important;
+  }
+}
