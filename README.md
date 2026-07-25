@@ -10,11 +10,11 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 ## Qué hace
 
 - Activa antialiasing.
-- Usa hinting medio para dar un poco más de cuerpo sin forzar negrita global.
-- Aplica Inter Medium únicamente a la interfaz de Firefox.
-- Refuerza el trazo web sin imponer fuentes, pesos, tamaños ni alterar diseños.
-- Eleva a 500 las fuentes base de KDE sin alterar sus pesos semibold/bold.
-- Prefiere render grayscale en lugar de subpixel RGB.
+- Usa hinting ligero (`hintslight`) para preservar la geometría y trazos naturales sin ensanchar letras.
+- Desactiva `stem darkening` en FreeType (`no-stem-darkening=1`) para evitar el engrosamiento automático en escala de grises.
+- Mantiene pesos tipográficos naturales (Regular 400 / Medium 500 nativos) sin forzar negritas globales.
+- Aplica suavizado `antialiased` limpio en la web (`userContent.css`) sin trazos artificiales destructivos (`-webkit-text-stroke`).
+- Prefiere render grayscale (`rgba=none`) en lugar de subpixel RGB.
 - Desactiva bitmaps incrustados para fuentes escalables.
 - Define una prioridad razonable de fuentes sans, serif, mono y emoji.
 - Regenera la caché de fuentes cuando `fc-cache` está disponible.

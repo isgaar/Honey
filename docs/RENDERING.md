@@ -20,32 +20,35 @@ Honey activa antialiasing:
 
 Esto suaviza bordes y evita que las letras se vean cortadas o escalonadas.
 
-### Hinting medio
+### Hinting ligero inteligente
 
-Honey usa `hintmedium`:
+Honey usa `hintslight`:
 
 ```xml
 <edit name="hintstyle" mode="assign">
-  <const>hintmedium</const>
+  <const>hintslight</const>
 </edit>
 ```
 
-### Interfaz de Firefox
+Alinea únicamente las baselines en el eje Y sin deformar ni ensanchar horizontalmente los trazos de los glifos.
 
-Honey usa una hoja `userChrome.css` por perfil para dar peso semibold 600 a la interfaz
-del navegador: pestañas, barra de direcciones, barra lateral y menús. La regla
-vive en la capa chrome de Firefox.
+### FreeType sin Stem Darkening
 
-Para las páginas usa una hoja `userContent.css` global que solo aplica un trazo
-de `0.1px` a los glifos. No fija familia, peso, tamaño, color, márgenes ni
-estructura, por lo que el diseño y la tipografía declarada por cada sitio se
-conservan.
+Honey desactiva el engrosamiento automático (*stem darkening*) en FreeType mediante la variable de entorno de sesión:
 
-En KDE, Honey eleva a peso 500 las fuentes base de `kdeglobals`; los pesos
-semibold y bold ya definidos se conservan.
+```bash
+FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 autofitter:no-stem-darkening=1 type1:no-stem-darkening=1 t1mode:no-stem-darkening=1"
+```
 
-La intencion es conservar la forma natural de la fuente sin forzar demasiado la
-grilla de pixeles.
+Esto evita que las fuentes en escala de grises (`rgba=none`) se vuelvan toscas o engrosadas artificialmente sobre fondos oscuros.
+
+### Interfaz y web en Firefox
+
+Honey usa una hoja `userChrome.css` por perfil para dar un antialiasing limpio en escala de grises a la interfaz del navegador (pestañas, barra de direcciones, menús) respetando la tipografía del sistema.
+
+Para el contenido web usa `userContent.css` únicamente con suavizado `-webkit-font-smoothing: antialiased` y `-moz-osx-font-smoothing: grayscale`. No aplica trazos artificiales (`-webkit-text-stroke`), lo que evita letras partidas, ahuecadas o borrosas en temas oscuros (como ChatGPT, Gemini o GitHub).
+
+La intencion es conservar la forma natural de la fuente sin forzar demasiado la grilla de pixeles ni engrosar trazos.
 
 ### Sin subpixel RGB
 
@@ -114,13 +117,13 @@ GTK:
 
 - `gtk-xft-antialias=1`
 - `gtk-xft-hinting=1`
-- `gtk-xft-hintstyle=hintmedium`
+- `gtk-xft-hintstyle=hintslight`
 - `gtk-xft-rgba=none`
 
 KDE:
 
 - `XftAntialias=true`
-- `XftHintStyle=hintmedium`
+- `XftHintStyle=hintslight`
 - `XftSubPixel=none`
 
 Sesión KDE:
@@ -129,7 +132,7 @@ Sesión KDE:
 - `~/.config/plasma-workspace/env/90-honey.sh`
 - `HONEY_ACTIVE=1`
 - `HONEY_FONTCONFIG=.../99-honey.conf`
-- `FREETYPE_PROPERTIES=truetype:interpreter-version=40`
+- `FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 autofitter:no-stem-darkening=1 type1:no-stem-darkening=1 t1mode:no-stem-darkening=1"`
 
 Estas claves ayudan a que VSCodium, apps Qt/KDE y apps GTK no se queden con un
 perfil distinto al de Honey.

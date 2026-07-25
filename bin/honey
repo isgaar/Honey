@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.5.1"
+VERSION="0.5.2"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -28,9 +28,9 @@ PLASMA_ENV_DIR="$CONFIG_HOME/plasma-workspace/env"
 HONEY_ENVIRONMENT_TARGET="$ENVIRONMENT_DIR/90-honey.conf"
 HONEY_PLASMA_ENV_TARGET="$PLASMA_ENV_DIR/90-honey.sh"
 HONEY_ACTIVE_VALUE="1"
-HONEY_HINTSTYLE="hintmedium"
-HONEY_KDE_FONT_WEIGHT="500"
-HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40"
+HONEY_HINTSTYLE="hintslight"
+HONEY_KDE_FONT_WEIGHT="400"
+HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 autofitter:no-stem-darkening=1 type1:no-stem-darkening=1 t1mode:no-stem-darkening=1"
 GTK3_SETTINGS="$CONFIG_HOME/gtk-3.0/settings.ini"
 GTK4_SETTINGS="$CONFIG_HOME/gtk-4.0/settings.ini"
 XSETTINGSD_CONFIG="$CONFIG_HOME/xsettingsd/xsettingsd.conf"
@@ -54,7 +54,7 @@ CODIUM_HONEY_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-honey.desktop"
 CODIUM_HONEY_USER_DATA_DIR="$CONFIG_HOME/VSCodium-Honey"
 CODIUM_HONEY_EXTENSIONS_DIR="$DATA_HOME/honey/codium/extensions"
 CODIUM_WRAPPER="/usr/bin/codium"
-HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=medium)
+HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=slight)
 
 green='\033[0;32m'
 yellow='\033[1;33m'
@@ -531,7 +531,7 @@ firefox_chrome_state() {
         [[ -n "$profile" ]] || continue
         found=1
         file="$profile/chrome/userChrome.css"
-        if [[ -f "$file" ]] && grep -q 'Managed by Honey: Firefox chrome only' "$file"; then
+        if [[ -f "$file" ]] && grep -q 'Managed by Honey' "$file"; then
             active=$((active + 1))
         fi
     done < <(firefox_profile_dirs)
@@ -551,7 +551,7 @@ firefox_web_state() {
         [[ -n "$profile" ]] || continue
         found=1
         file="$profile/chrome/userContent.css"
-        if [[ -f "$file" ]] && grep -q 'Managed by Honey: neutral web rendering only' "$file"; then
+        if [[ -f "$file" ]] && grep -q 'Managed by Honey' "$file"; then
             active=$((active + 1))
         fi
     done < <(firefox_profile_dirs)
@@ -617,7 +617,7 @@ apply_electron_flags() {
         should_apply_flags_file "$file" || continue
         label="$(basename "$file")"
         remember_original "$file" "$label"
-        ensure_flag "$file" "^--font-render-hinting=" "--font-render-hinting=medium"
+        ensure_flag "$file" "^--font-render-hinting=" "--font-render-hinting=slight"
         ensure_flag "$file" "^--disable-lcd-text$" "--disable-lcd-text"
     done
 }

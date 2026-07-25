@@ -40,7 +40,7 @@ variables de sesión:
 ```text
 HONEY_ACTIVE=1
 HONEY_FONTCONFIG=~/.config/fontconfig/conf.d/99-honey.conf
-FREETYPE_PROPERTIES=truetype:interpreter-version=40
+FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 autofitter:no-stem-darkening=1 type1:no-stem-darkening=1 t1mode:no-stem-darkening=1"
 ```
 
 Honey escribe esas variables en:

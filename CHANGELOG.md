@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+
+- Implementa engrosamiento tipográfico inteligente con hinting ligero (`hintslight`) y no-stem-darkening en FreeType.
+- Corrije la renderización en sitios web eliminando el destructivo `-webkit-text-stroke` de `userContent.css`.
+- Restaura el antialiased smoothing nativo respetando los pesos tipográficos naturales en Firefox, GTK, KDE y Electron.
+- Añade renderizado y tipografía nativa estilo macOS (SF Pro/Inter, letter-spacing -0.15px, peso 500 en pestaña activa) para la interfaz de Firefox en `userChrome.css`.
+
 ## 0.5.1
 
 - Añade un trazo web neutral para todas las páginas sin modificar su diseño.

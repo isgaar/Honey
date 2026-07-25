@@ -1,29 +1,59 @@
-/* Managed by Honey: Firefox chrome only. */
-/* This file styles browser controls, never web documents. */
+/* Managed by Honey: Firefox chrome clean UI font rendering. */
+/* Applies clean font smoothing and natural weights to browser interface only. */
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
+/* Firefox interface root typography */
 :root,
 #navigator-toolbox,
 #sidebar-box,
 #sidebar,
 #browser-bottombox {
-  font-family: "Inter SemiBold", "Inter Medium", "Inter", sans-serif !important;
-  font-weight: 600 !important;
-}
-
-/* Firefox's chrome contains nested XUL/HTML controls with their own defaults. */
-:root *:not(image):not(svg):not(path):not(.toolbarbutton-icon):not(.tab-icon-image) {
-  font-family: "Inter SemiBold", "Inter Medium", "Inter", sans-serif !important;
-  font-weight: 600 !important;
+  font-family: "Inter", system-ui, sans-serif !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: antialiased !important;
+  text-rendering: optimizeLegibility !important;
 }
 
 #navigator-toolbox :is(label, button, input, textbox, .tab-label, .toolbarbutton-text,
   .menu-text, .menuitem-text, .urlbar-input, #urlbar-input, #searchbar-input),
 #sidebar-box :is(label, button, input, textbox, treechildren, .sidebar-placesTreechildren),
 #sidebar :is(label, button, input, textbox, treechildren) {
-  font-family: "Inter SemiBold", "Inter Medium", "Inter", sans-serif !important;
-  font-weight: 600 !important;
+  font-family: "Inter", system-ui, sans-serif !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: antialiased !important;
+  text-rendering: optimizeLegibility !important;
+  letter-spacing: normal !important;
+}
+
+/* Address bar / URL bar typography (Medium weight 500, clean smoothing) */
+#urlbar-input,
+.urlbar-input,
+#searchbar-input,
+#urlbar-input::placeholder,
+.urlbar-input::placeholder {
+  font-family: "Inter", system-ui, sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 13.5px !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  -webkit-font-smoothing: antialiased !important;
+  letter-spacing: normal !important;
+}
+
+#urlbar-input::placeholder,
+.urlbar-input::placeholder {
+  opacity: 0.75 !important;
+}
+
+/* Tab weight hierarchy: Active tab medium (500), inactive tab regular (400) */
+.tabbrowser-tab[selected] .tab-label,
+.tabbrowser-tab[selected="true"] .tab-label {
+  font-weight: 500 !important;
+}
+
+.tabbrowser-tab:not([selected]) .tab-label,
+.tabbrowser-tab:not([selected="true"]) .tab-label {
+  font-weight: 400 !important;
 }
 
 /* Keep pictograms and image-backed controls untouched. */
