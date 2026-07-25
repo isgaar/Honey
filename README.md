@@ -10,9 +10,9 @@ de `fontconfig` y permite activar o retirar el perfil cuando quieras.
 ## Qué hace
 
 - Activa antialiasing.
-- Usa hinting ligero (`hintslight`) para preservar la geometría y trazos naturales sin ensanchar letras.
-- Desactiva `stem darkening` en FreeType (`no-stem-darkening=1`) para evitar el engrosamiento automático en escala de grises.
-- Mantiene pesos tipográficos naturales (Regular 400 / Medium 500 nativos) sin forzar negritas globales.
+- Usa hinting ligero (`hintslight`) para preservar la geometría y curvas redondas perfectas sin deformar letras.
+- Activa `stem darkening` en FreeType (`no-stem-darkening=0`) para dar el cuerpo sólido y redondeo limpio característico de macOS sobre temas oscuros.
+- Establece peso Medium 500 para la interfaz manteniendo legibilidad y presencia sin forzar negritas globales.
 - Aplica suavizado `antialiased` limpio en la web (`userContent.css`) sin trazos artificiales destructivos (`-webkit-text-stroke`).
 - Prefiere render grayscale (`rgba=none`) en lugar de subpixel RGB.
 - Desactiva bitmaps incrustados para fuentes escalables.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.3
+
+- Activa FreeType stem darkening controlado (`no-stem-darkening=0`) y peso base Medium 500 para dar a la tipografía el cuerpo justo, solidez y redondeo limpio característico del renderizado de macOS.
+- Mantiene hinting ligero (`hintslight`) para preservar la curvatura geométrica perfecta en editores, terminales y ventanas.
+
 ## 0.5.2
 
 - Implementa engrosamiento tipográfico inteligente con hinting ligero (`hintslight`) y no-stem-darkening en FreeType.

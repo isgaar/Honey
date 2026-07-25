@@ -32,15 +32,15 @@ Honey usa `hintslight`:
 
 Alinea únicamente las baselines en el eje Y sin deformar ni ensanchar horizontalmente los trazos de los glifos.
 
-### FreeType sin Stem Darkening
+### FreeType Stem Darkening estilo macOS
 
-Honey desactiva el engrosamiento automático (*stem darkening*) en FreeType mediante la variable de entorno de sesión:
+Honey habilita el *stem darkening* controlado en FreeType mediante la variable de entorno de sesión:
 
 ```bash
-FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 autofitter:no-stem-darkening=1 type1:no-stem-darkening=1 t1mode:no-stem-darkening=1"
+FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"
 ```
 
-Esto evita que las fuentes en escala de grises (`rgba=none`) se vuelvan toscas o engrosadas artificialmente sobre fondos oscuros.
+Esto replica el comportamiento de compensación de gamma de macOS CoreText, dando a las fuentes el cuerpo justo, redondeo limpio y curvas geométricas sólidas sobre temas oscuros sin deformar las letras.
 
 ### Interfaz y web en Firefox
 
@@ -132,7 +132,7 @@ Sesión KDE:
 - `~/.config/plasma-workspace/env/90-honey.sh`
 - `HONEY_ACTIVE=1`
 - `HONEY_FONTCONFIG=.../99-honey.conf`
-- `FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 autofitter:no-stem-darkening=1 type1:no-stem-darkening=1 t1mode:no-stem-darkening=1"`
+- `FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"`
 
 Estas claves ayudan a que VSCodium, apps Qt/KDE y apps GTK no se queden con un
 perfil distinto al de Honey.
