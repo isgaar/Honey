@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Agrega soporte integral para aplicaciones Electron (VS Code, VSCodium, Cursor, Antigravity, Obsidian, Slack, Discord, Element, Spotify, etc.) para imitar la calidad de renderizado de texto de macOS.
+- Habilita `truetype:no-stem-darkening=0` en `FREETYPE_PROPERTIES` y `<edit name="stemdarkening">` en Fontconfig para asegurar la solidez y grosor de trazo en fuentes TrueType (Inter, JetBrains Mono, SF Pro, Roboto).
+- Sincroniza banderas globales e individuales de Electron (`--disable-lcd-text`, `--font-render-hinting=slight`, `--enable-font-antialiasing`) a través de archivos `.conf` en `~/.config/`.
+- Añade el comando `honey launch-electron COMANDO [ARGS]` (y alias como `launch-code` y `launch-cursor`) para ejecutar cualquier aplicación Electron con el perfil de render macOS.
+
 ## 0.5.3
 
 - Activa FreeType stem darkening controlado (`no-stem-darkening=0`) y peso base Medium 500 para dar a la tipografía el cuerpo justo, solidez y redondeo limpio característico del renderizado de macOS.

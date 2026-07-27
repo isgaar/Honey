@@ -140,25 +140,29 @@ En KDE, Honey alinea `XftAntialias`, `XftHintStyle` y `XftSubPixel` dentro de
 `userChrome.css` limitada a la interfaz y `userContent.css` con un ajuste de
 trazo neutral; no impone fuentes, pesos, tamaños ni reglas de diseño.
 
-## VSCodium y Electron
+## VSCodium, VS Code, Cursor y Aplicaciones Electron
 
-VSCodium puede no reflejar Honey si ya estaba abierto antes de aplicar el
-perfil. Honey instala una capa de sesión para KDE mediante `environment.d`,
-`plasma-workspace/env`, DBus y systemd user. Si detecta VSCodium, también
-genera un override reversible de su lanzador KDE para asegurar que el proceso
-reciba el render especializado incluso con instalaciones locales en `/opt`.
+Las aplicaciones Electron (VS Code, VSCodium, Cursor, Antigravity, Obsidian, Slack, Discord, Element, Spotify, etc.) usan el motor Chromium/Skia. Por defecto en Linux, este motor puede renderizar fuentes delgadas o con franjas subpixel RGB.
 
-Después de `honey apply`, los lanzamientos nuevos de KDE deben heredar:
+Honey configura las aplicaciones Electron para imitar la calidad y suavizado de **macOS**:
+- Configura archivos de banderas en `~/.config/` (`code-flags.conf`, `codium-flags.conf`, `electron-flags.conf`, etc.) con `--disable-lcd-text`, `--font-render-hinting=slight` y `--enable-font-antialiasing`.
+- Habilita `truetype:no-stem-darkening=0` en FreeType para dar volumen y solidez a fuentes TrueType (Inter, JetBrains Mono, SF Pro).
+- Inyecta la capa de sesión mediante `environment.d`, `plasma-workspace/env`, DBus y systemd user.
+
+Después de `honey apply`, las aplicaciones Electron heredan:
 
 ```text
 HONEY_ACTIVE=1
 HONEY_FONTCONFIG=$HOME/.config/fontconfig/conf.d/99-honey.conf
-FREETYPE_PROPERTIES=truetype:interpreter-version=40
+FREETYPE_PROPERTIES=truetype:interpreter-version=40 truetype:no-stem-darkening=0 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0
 ```
 
-Para diagnosticar una app Electron sin depender del menú:
+Para lanzar cualquier aplicación Electron directamente con el perfil macOS de Honey:
 
 ```bash
+honey launch-electron cursor
+honey launch-code .
+honey launch-codium .
 honey launch-honey-codium .
 ```
 

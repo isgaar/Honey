@@ -3,7 +3,7 @@
 
 set -Eeuo pipefail
 
-VERSION="0.5.3"
+VERSION="0.6.0"
 
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 while [[ -L "$SCRIPT_PATH" ]]; do
@@ -30,7 +30,7 @@ HONEY_PLASMA_ENV_TARGET="$PLASMA_ENV_DIR/90-honey.sh"
 HONEY_ACTIVE_VALUE="1"
 HONEY_HINTSTYLE="hintslight"
 HONEY_KDE_FONT_WEIGHT="500"
-HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"
+HONEY_FREETYPE_PROPERTIES="truetype:interpreter-version=40 truetype:no-stem-darkening=0 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"
 GTK3_SETTINGS="$CONFIG_HOME/gtk-3.0/settings.ini"
 GTK4_SETTINGS="$CONFIG_HOME/gtk-4.0/settings.ini"
 XSETTINGSD_CONFIG="$CONFIG_HOME/xsettingsd/xsettingsd.conf"
@@ -44,6 +44,16 @@ ELECTRON_FLAGS="$CONFIG_HOME/electron-flags.conf"
 CODIUM_FLAGS="$CONFIG_HOME/codium-flags.conf"
 CODE_FLAGS="$CONFIG_HOME/code-flags.conf"
 VSCODE_OSS_FLAGS="$CONFIG_HOME/vscode-oss-flags.conf"
+CURSOR_FLAGS="$CONFIG_HOME/cursor-flags.conf"
+ANTIGRAVITY_FLAGS="$CONFIG_HOME/antigravity-flags.conf"
+OBSIDIAN_FLAGS="$CONFIG_HOME/obsidian-flags.conf"
+SLACK_FLAGS="$CONFIG_HOME/slack-flags.conf"
+DISCORD_FLAGS="$CONFIG_HOME/discord-flags.conf"
+ELEMENT_FLAGS="$CONFIG_HOME/element-flags.conf"
+SPOTIFY_FLAGS="$CONFIG_HOME/spotify-flags.conf"
+CHROME_FLAGS="$CONFIG_HOME/chrome-flags.conf"
+CHROMIUM_FLAGS="$CONFIG_HOME/chromium-flags.conf"
+BRAVE_FLAGS="$CONFIG_HOME/brave-flags.conf"
 
 LOCAL_APPLICATIONS_DIR="$DATA_HOME/applications"
 CODIUM_DESKTOP_SOURCE="/usr/share/applications/codium.desktop"
@@ -54,7 +64,7 @@ CODIUM_HONEY_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-honey.desktop"
 CODIUM_HONEY_USER_DATA_DIR="$CONFIG_HOME/VSCodium-Honey"
 CODIUM_HONEY_EXTENSIONS_DIR="$DATA_HOME/honey/codium/extensions"
 CODIUM_WRAPPER="/usr/bin/codium"
-HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=slight)
+HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=slight --enable-font-antialiasing)
 
 green='\033[0;32m'
 yellow='\033[1;33m'
@@ -72,7 +82,10 @@ Honey
 Uso:
   honey apply        Activa fontconfig y compatibilidad GTK/KDE/Electron
   honey reset        Retira Honey y restaura configs originales conocidas
-  honey launch-codium [RUTA] Abre Codium con los flags de Honey
+  honey launch-electron COMANDO [ARGS] Abre cualquier app Electron con el render macOS de Honey
+  honey launch-codium [RUTA] Abre Codium con el render macOS de Honey
+  honey launch-code [RUTA] Abre VS Code con el render macOS de Honey
+  honey launch-cursor [RUTA] Abre Cursor con el render macOS de Honey
   honey launch-honey-codium [RUTA] Abre una instancia aislada para diagnostico
   honey status       Muestra estado y muestras de fontconfig
   honey doctor       Revisa dependencias y rutas
@@ -85,6 +98,7 @@ Honey no necesita sudo. Sus cambios viven en:
 
 Tambien sincroniza, con respaldo, estas capas cuando existen:
   GTK 3/4, xsettingsd, KDE/kdeglobals y entorno de sesion KDE/DBus.
+  Electron: flags globales e individuales (~/.config/*-flags.conf) y lanzadores.
   Firefox recibe una hoja userChrome.css solo para su interfaz.
 EOF
 }
@@ -587,22 +601,68 @@ apply_kde_config() {
     done
 }
 
+electron_flags_files() {
+    printf '%s\n' "$ELECTRON_FLAGS" "$CODIUM_FLAGS" "$CODE_FLAGS" "$VSCODE_OSS_FLAGS" \
+                  "$CURSOR_FLAGS" "$ANTIGRAVITY_FLAGS" "$OBSIDIAN_FLAGS" "$SLACK_FLAGS" \
+                  "$DISCORD_FLAGS" "$ELEMENT_FLAGS" "$SPOTIFY_FLAGS" "$CHROME_FLAGS" \
+                  "$CHROMIUM_FLAGS" "$BRAVE_FLAGS"
+    local v
+    for v in {16..35}; do
+        printf '%s/electron%d-flags.conf\n' "$CONFIG_HOME" "$v"
+    done
+}
+
 should_apply_flags_file() {
     local file="$1"
+    local base
+    base="$(basename "$file")"
 
     if [[ -e "$file" ]]; then
         return 0
     fi
 
-    case "$file" in
-        "$CODIUM_FLAGS")
-            [[ -d "$CONFIG_HOME/VSCodium" ]] || command_exists codium
+    case "$base" in
+        electron-flags.conf|electron*-flags.conf)
+            return 0
             ;;
-        "$CODE_FLAGS")
+        codium-flags.conf)
+            [[ -d "$CONFIG_HOME/VSCodium" ]] || command_exists codium || command_exists vscodium
+            ;;
+        code-flags.conf)
             [[ -d "$CONFIG_HOME/Code" ]] || command_exists code
             ;;
-        "$VSCODE_OSS_FLAGS")
+        vscode-oss-flags.conf)
             [[ -d "$CONFIG_HOME/Code - OSS" ]] || command_exists code-oss
+            ;;
+        cursor-flags.conf)
+            [[ -d "$CONFIG_HOME/Cursor" ]] || command_exists cursor
+            ;;
+        antigravity-flags.conf)
+            [[ -d "$CONFIG_HOME/antigravity" || -d "$CONFIG_HOME/antigravity-ide" ]] || command_exists antigravity
+            ;;
+        obsidian-flags.conf)
+            [[ -d "$CONFIG_HOME/obsidian" ]] || command_exists obsidian
+            ;;
+        slack-flags.conf)
+            [[ -d "$CONFIG_HOME/Slack" ]] || command_exists slack
+            ;;
+        discord-flags.conf)
+            [[ -d "$CONFIG_HOME/discord" ]] || command_exists discord
+            ;;
+        element-flags.conf)
+            [[ -d "$CONFIG_HOME/Element" ]] || command_exists element-desktop
+            ;;
+        spotify-flags.conf)
+            [[ -d "$CONFIG_HOME/spotify" ]] || command_exists spotify
+            ;;
+        chrome-flags.conf)
+            [[ -d "$CONFIG_HOME/google-chrome" ]] || command_exists google-chrome || command_exists google-chrome-stable
+            ;;
+        chromium-flags.conf)
+            [[ -d "$CONFIG_HOME/chromium" ]] || command_exists chromium || command_exists chromium-freeworld
+            ;;
+        brave-flags.conf)
+            [[ -d "$CONFIG_HOME/BraveSoftware" ]] || command_exists brave || command_exists brave-browser
             ;;
         *)
             return 1
@@ -613,13 +673,25 @@ should_apply_flags_file() {
 apply_electron_flags() {
     local file label
 
-    for file in "$CODIUM_FLAGS" "$CODE_FLAGS" "$VSCODE_OSS_FLAGS" "$ELECTRON_FLAGS"; do
+    while IFS= read -r file; do
+        [[ -n "$file" ]] || continue
         should_apply_flags_file "$file" || continue
         label="$(basename "$file")"
         remember_original "$file" "$label"
         ensure_flag "$file" "^--font-render-hinting=" "--font-render-hinting=slight"
         ensure_flag "$file" "^--disable-lcd-text$" "--disable-lcd-text"
-    done
+        ensure_flag "$file" "^--enable-font-antialiasing$" "--enable-font-antialiasing"
+    done < <(electron_flags_files)
+}
+
+reset_electron_flags() {
+    local file label
+
+    while IFS= read -r file; do
+        [[ -n "$file" ]] || continue
+        label="$(basename "$file")"
+        restore_original "$file" "$label"
+    done < <(electron_flags_files)
 }
 
 patch_codium_desktop_file() {
@@ -730,24 +802,13 @@ apply_codium_launchers() {
     refresh_desktop_launchers
 }
 
-restore_legacy_app_overrides() {
-    restore_original "$CODIUM_FLAGS" "codium-flags.conf"
-    restore_original "$CODE_FLAGS" "code-flags.conf"
-    restore_original "$VSCODE_OSS_FLAGS" "vscode-oss-flags.conf"
-    restore_original "$ELECTRON_FLAGS" "electron-flags.conf"
-    restore_original "$CODIUM_DESKTOP_TARGET" "codium.desktop"
-    restore_original "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
-    restore_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
-    refresh_desktop_launchers
-}
-
 apply_compatibility() {
     apply_gtk_config
     apply_xsettingsd_config
     apply_kde_config
     apply_firefox_chrome_config
     apply_kde_session_environment
-    restore_legacy_app_overrides
+    apply_electron_flags
     if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
         apply_codium_launchers
     fi
@@ -762,10 +823,7 @@ reset_compatibility() {
     restore_original "$XSETTINGSD_CONFIG" "xsettingsd.conf"
     restore_original "$KDE_GLOBALS" "kdeglobals"
     reset_firefox_chrome_config
-    restore_original "$CODIUM_FLAGS" "codium-flags.conf"
-    restore_original "$CODE_FLAGS" "code-flags.conf"
-    restore_original "$VSCODE_OSS_FLAGS" "vscode-oss-flags.conf"
-    restore_original "$ELECTRON_FLAGS" "electron-flags.conf"
+    reset_electron_flags
     restore_original "$CODIUM_DESKTOP_TARGET" "codium.desktop"
     restore_original "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
     restore_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
@@ -971,6 +1029,50 @@ resolve_codium_bin() {
     printf '%s\n' "$bin"
 }
 
+launch_electron() {
+    local cmd="${1:-}"
+    if [[ -z "$cmd" ]]; then
+        die "Uso: honey launch-electron <comando_o_ejecutable> [argumentos...]"
+    fi
+    shift || true
+
+    local bin=""
+    if command_exists "$cmd"; then
+        bin="$(command -v "$cmd")"
+    elif [[ -x "$cmd" ]]; then
+        bin="$cmd"
+    else
+        die "No se encontro el comando o ejecutable: $cmd"
+    fi
+
+    prepare_launch_environment
+    "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
+}
+
+launch_code() {
+    local bin=""
+    if command_exists code; then
+        bin="$(command -v code)"
+    elif command_exists code-oss; then
+        bin="$(command -v code-oss)"
+    fi
+    [[ -n "$bin" ]] || die "No encontre VS Code (code o code-oss)"
+
+    prepare_launch_environment
+    "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
+}
+
+launch_cursor() {
+    local bin=""
+    if command_exists cursor; then
+        bin="$(command -v cursor)"
+    fi
+    [[ -n "$bin" ]] || die "No encontre Cursor (cursor)"
+
+    prepare_launch_environment
+    "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
+}
+
 launch_codium() {
     local bin
 
@@ -1003,6 +1105,9 @@ main() {
     case "$command_name" in
         apply) apply_profile ;;
         reset) reset_profile ;;
+        launch-electron) launch_electron "$@" ;;
+        launch-code) launch_code "$@" ;;
+        launch-cursor) launch_cursor "$@" ;;
         launch-codium) launch_codium "$@" ;;
         launch-honey-codium) launch_honey_codium "$@" ;;
         status) status ;;
