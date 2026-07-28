@@ -3,10 +3,12 @@
 ## 0.6.0
 
 - Agrega soporte integral para aplicaciones Electron (VS Code, VSCodium, Cursor, Antigravity, Obsidian, Slack, Discord, Element, Spotify, etc.) para imitar la calidad de renderizado de texto de macOS.
+- Agrega integración con **Flatpak** (`flatpak override --user`): otorga acceso de lectura a Fontconfig e inyecta `FREETYPE_PROPERTIES` y variables de sesión a todas las apps Flatpak.
+- Amplía la detección de navegadores a rutas XDG y Flatpak para **Firefox, Zen Browser, Floorp, Waterfox y LibreWolf** (sincronizando `userChrome.css`, `userContent.css` y `user.js`).
 - Elimina los bordes delgados y afilados cambiando el hinting a `hintnone` (`hinting=false` / `--font-render-hinting=none`) en Fontconfig, GTK 3/4, xsettingsd, KDE y Electron.
 - Promueve el peso base de la interfaz y fuentes predeterminadas a `SemiBold` (peso 600) en Fontconfig y KDE para dar volumen, solidez y cuerpo grueso a ventanas, menús y editores.
 - Habilita `truetype:no-stem-darkening=0` en `FREETYPE_PROPERTIES` y `<edit name="stemdarkening">` en Fontconfig para asegurar la solidez y grosor de trazo en fuentes TrueType (Inter, JetBrains Mono, SF Pro, Roboto).
-- Sincroniza banderas globales e individuales de Electron (`--disable-lcd-text`, `--font-render-hinting=none`, `--enable-font-antialiasing`) a través de archivos `.conf` en `~/.config/`.
+- Sincroniza banderas globales e individuales de Electron (`--disable-lcd-text`, `--font-render-hinting=none`, `--enable-font-antialiasing`) a través de archivos `.conf` en `~/.config/` y `~/.var/app/*/config/`.
 - Añade el comando `honey launch-electron COMANDO [ARGS]` (y alias como `launch-code` y `launch-cursor`) para ejecutar cualquier aplicación Electron con el perfil de render macOS.
 
 ## 0.5.3

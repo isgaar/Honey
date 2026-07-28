@@ -393,54 +393,82 @@ apply_gtk_config() {
     done
 }
 
+browser_root_dirs() {
+    local d
+    for d in \
+        "$CONFIG_HOME/mozilla/firefox" \
+        "$HOME/.mozilla/firefox" \
+        "$CONFIG_HOME/zen" \
+        "$HOME/.zen" \
+        "$CONFIG_HOME/floorp" \
+        "$HOME/.floorp" \
+        "$CONFIG_HOME/waterfox" \
+        "$HOME/.waterfox" \
+        "$CONFIG_HOME/librewolf" \
+        "$HOME/.librewolf" \
+        "$HOME/.var/app/org.mozilla.firefox/.mozilla/firefox" \
+        "$HOME/.var/app/app.zen_browser.zen/.zen" \
+        "$HOME/.var/app/one.floorp.Floorp/.floorp" \
+        "$HOME/.var/app/io.gitlab.librewolf-community/.librewolf" \
+        "$HOME/.var/app/net.waterfox.waterfox/.waterfox"
+    do
+        [[ -d "$d" ]] && printf '%s\n' "$d"
+    done | sort -u
+}
+
 firefox_profile_dirs() {
-    if [[ -f "$FIREFOX_PROFILES_INI" ]]; then
-        awk -F= -v root="$FIREFOX_CONFIG_DIR" '
-            function emit() {
-                if (path == "") {
-                    return
+    local root_dir
+    while IFS= read -r root_dir; do
+        [[ -n "$root_dir" ]] || continue
+        local profiles_ini="$root_dir/profiles.ini"
+        if [[ -f "$profiles_ini" ]]; then
+            awk -F= -v root="$root_dir" '
+                function emit() {
+                    if (path == "") {
+                        return
+                    }
+                    gsub(/^[[:space:]]+|[[:space:]]+$/, "", path)
+                    if (relative == "1") {
+                        print root "/" path
+                    } else {
+                        print path
+                    }
                 }
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", path)
-                if (relative == "1") {
-                    print root "/" path
-                } else {
-                    print path
+                /^\[Profile[0-9]+\][[:space:]]*$/ {
+                    if (in_profile) {
+                        emit()
+                    }
+                    path = ""
+                    relative = "1"
+                    in_profile = 1
+                    next
                 }
-            }
-            /^\[Profile[0-9]+\][[:space:]]*$/ {
-                if (in_profile) {
-                    emit()
+                /^\[/ {
+                    if (in_profile) {
+                        emit()
+                    }
+                    path = ""
+                    in_profile = 0
+                    next
                 }
-                path = ""
-                relative = "1"
-                in_profile = 1
-                next
-            }
-            /^\[/ {
-                if (in_profile) {
-                    emit()
+                in_profile && $1 == "Path" {
+                    path = $2
+                    next
                 }
-                path = ""
-                in_profile = 0
-                next
-            }
-            in_profile && $1 == "Path" {
-                path = $2
-                next
-            }
-            in_profile && $1 == "IsRelative" {
-                relative = $2
-                next
-            }
-            END {
-                if (in_profile) {
-                    emit()
+                in_profile && $1 == "IsRelative" {
+                    relative = $2
+                    next
                 }
-            }
-        ' "$FIREFOX_PROFILES_INI"
-    elif [[ -d "$FIREFOX_CONFIG_DIR" ]]; then
-        find "$FIREFOX_CONFIG_DIR" -mindepth 2 -maxdepth 2 -type f -name prefs.js -printf '%h\n'
-    fi | while IFS= read -r profile; do
+                END {
+                    if (in_profile) {
+                        emit()
+                    }
+                }
+            ' "$profiles_ini"
+        elif [[ -d "$root_dir" ]]; then
+            find "$root_dir" -mindepth 1 -maxdepth 2 -type f -name prefs.js -printf '%h\n' 2>/dev/null
+        fi
+    done < <(browser_root_dirs) | while IFS= read -r profile; do
         [[ -f "$profile/prefs.js" ]] && printf '%s\n' "$profile"
     done | sort -u
 }
@@ -609,6 +637,17 @@ electron_flags_files() {
     local v
     for v in {16..35}; do
         printf '%s/electron%d-flags.conf\n' "$CONFIG_HOME" "$v"
+    done
+
+    local app_dir
+    for app_dir in "$HOME"/.var/app/*/config; do
+        [[ -d "$app_dir" ]] || continue
+        printf '%s/electron-flags.conf\n' "$app_dir"
+        printf '%s/chrome-flags.conf\n' "$app_dir"
+        printf '%s/chromium-flags.conf\n' "$app_dir"
+        printf '%s/brave-flags.conf\n' "$app_dir"
+        printf '%s/code-flags.conf\n' "$app_dir"
+        printf '%s/codium-flags.conf\n' "$app_dir"
     done
 }
 
@@ -802,6 +841,26 @@ apply_codium_launchers() {
     refresh_desktop_launchers
 }
 
+apply_flatpak_config() {
+    if command_exists flatpak; then
+        flatpak override --user \
+            --filesystem=xdg-config/fontconfig:ro \
+            --filesystem=xdg-data/fonts:ro \
+            --filesystem=~/.local/share/fonts:ro \
+            --env=HONEY_ACTIVE="$HONEY_ACTIVE_VALUE" \
+            --env=HONEY_FONTCONFIG="$PROFILE_TARGET" \
+            --env=FREETYPE_PROPERTIES="$HONEY_FREETYPE_PROPERTIES" \
+            >/dev/null 2>&1 || warn "No se pudieron aplicar overrides de Flatpak"
+        ok "Overrides de Flatpak aplicados (fontconfig y FREETYPE_PROPERTIES)"
+    fi
+}
+
+reset_flatpak_config() {
+    if command_exists flatpak; then
+        flatpak override --user --reset >/dev/null 2>&1 || true
+    fi
+}
+
 apply_compatibility() {
     apply_gtk_config
     apply_xsettingsd_config
@@ -809,10 +868,11 @@ apply_compatibility() {
     apply_firefox_chrome_config
     apply_kde_session_environment
     apply_electron_flags
+    apply_flatpak_config
     if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
         apply_codium_launchers
     fi
-    ok "Compatibilidad GTK/KDE/Electron aplicada desde la sesion"
+    ok "Compatibilidad GTK/KDE/Electron/Flatpak aplicada desde la sesion"
 }
 
 reset_compatibility() {
@@ -824,6 +884,7 @@ reset_compatibility() {
     restore_original "$KDE_GLOBALS" "kdeglobals"
     reset_firefox_chrome_config
     reset_electron_flags
+    reset_flatpak_config
     restore_original "$CODIUM_DESKTOP_TARGET" "codium.desktop"
     restore_original "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
     restore_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
