@@ -6,7 +6,7 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use honey_core::{HoneyFace, OutlineBuilder};
+use honey_core::{compute_dilation_factor, dilate_mask, GlyphOutline, HoneyFace, OutlineBuilder, QuartzRasterizer};
 use std::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ulong, c_ushort, c_void, CStr, CString};
 use std::fs;
 use std::ptr;
@@ -19,7 +19,14 @@ extern "C" {
 
 pub const FT_GLYPH_FORMAT_BITMAP: c_uint = 0x6269_7473; // 'bits'
 pub const FT_GLYPH_FORMAT_OUTLINE: c_uint = 0x6f75_746c; // 'outl'
+pub const FT_PIXEL_MODE_NONE: c_uchar = 0;
+pub const FT_PIXEL_MODE_MONO: c_uchar = 1;
 pub const FT_PIXEL_MODE_GRAY: c_uchar = 2;
+pub const FT_PIXEL_MODE_GRAY2: c_uchar = 3;
+pub const FT_PIXEL_MODE_GRAY4: c_uchar = 4;
+pub const FT_PIXEL_MODE_LCD: c_uchar = 5;
+pub const FT_PIXEL_MODE_LCD_V: c_uchar = 6;
+pub const FT_PIXEL_MODE_BGRA: c_uchar = 7;
 
 pub const FT_LOAD_DEFAULT: c_int = 0;
 pub const FT_LOAD_NO_SCALE: c_int = 1 << 0;
@@ -911,22 +918,14 @@ pub unsafe extern "C" fn FT_Load_Glyph(
         (*slot).outline.contours = (*ctx).outline_contours.as_mut_ptr();
         (*slot).outline.flags = 0x01;
 
-        if let Some((x_min, y_min, x_max, y_max)) = hf.glyph_bounding_box(glyph_index) {
-            (*slot).metrics.width = (((x_max - x_min) as f32 * scale) * 64.0) as c_long;
-            (*slot).metrics.height = (((y_max - y_min) as f32 * scale) * 64.0) as c_long;
-            (*slot).metrics.horiBearingX = ((x_min as f32 * scale) * 64.0) as c_long;
-            (*slot).metrics.horiBearingY = ((y_max as f32 * scale) * 64.0) as c_long;
-        } else {
-            (*slot).metrics.width = 0;
-            (*slot).metrics.height = 0;
-            (*slot).metrics.horiBearingX = 0;
-            (*slot).metrics.horiBearingY = 0;
-        }
-
-        let adv = hf.glyph_hor_advance(glyph_index).unwrap_or(0) as f32 * scale;
-        (*slot).metrics.horiAdvance = (adv * 64.0) as c_long;
-        (*slot).linearHoriAdvance = (adv * 65536.0) as c_long;
-        (*slot).advance.x = (adv * 64.0) as c_long;
+        let metrics = hf.glyph_metrics(glyph_index, (*ctx).pixel_size);
+        (*slot).metrics.width = (metrics.width as c_long) << 6;
+        (*slot).metrics.height = (metrics.height as c_long) << 6;
+        (*slot).metrics.horiBearingX = (metrics.left as c_long) << 6;
+        (*slot).metrics.horiBearingY = (metrics.top as c_long) << 6;
+        (*slot).metrics.horiAdvance = (metrics.advance * 64.0).round() as c_long;
+        (*slot).linearHoriAdvance = (metrics.advance * 65536.0).round() as c_long;
+        (*slot).advance.x = (metrics.advance * 64.0).round() as c_long;
         (*slot).advance.y = 0;
         (*slot).format = FT_GLYPH_FORMAT_OUTLINE;
 
@@ -997,13 +996,21 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
 
                 (*slot).bitmap_left = left;
                 (*slot).bitmap_top = top;
-                (*slot).advance.x = (adv * 64.0) as c_long;
+                (*slot).advance.x = (adv * 64.0).round() as c_long;
                 (*slot).advance.y = 0;
+                (*slot).metrics.width = (bmp.width as c_long) << 6;
+                (*slot).metrics.height = (bmp.height as c_long) << 6;
+                (*slot).metrics.horiBearingX = (left as c_long) << 6;
+                (*slot).metrics.horiBearingY = (top as c_long) << 6;
+                (*slot).metrics.horiAdvance = (adv * 64.0).round() as c_long;
+                (*slot).linearHoriAdvance = (adv * 65536.0).round() as c_long;
                 (*slot).format = FT_GLYPH_FORMAT_BITMAP;
 
                 return 0;
             } else {
                 // Empty glyph (e.g. whitespace, control character, zero-contour outline)
+                let upem = (*face).units_per_EM.max(1) as f32;
+                let adv = hf.glyph_hor_advance(gid).unwrap_or(0) as f32 * (px_size / upem);
                 (*ctx).last_bitmap_buffer.clear();
                 (*slot).bitmap.width = 0;
                 (*slot).bitmap.rows = 0;
@@ -1013,6 +1020,14 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
                 (*slot).bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
                 (*slot).bitmap_left = 0;
                 (*slot).bitmap_top = 0;
+                (*slot).advance.x = (adv * 64.0).round() as c_long;
+                (*slot).advance.y = 0;
+                (*slot).metrics.width = 0;
+                (*slot).metrics.height = 0;
+                (*slot).metrics.horiBearingX = 0;
+                (*slot).metrics.horiBearingY = 0;
+                (*slot).metrics.horiAdvance = (adv * 64.0).round() as c_long;
+                (*slot).linearHoriAdvance = (adv * 65536.0).round() as c_long;
                 (*slot).format = FT_GLYPH_FORMAT_BITMAP;
 
                 return 0;
@@ -1601,10 +1616,11 @@ pub unsafe extern "C" fn FT_Get_Glyph(
     if (*slot).format == FT_GLYPH_FORMAT_BITMAP {
         let bmp_len = ((*slot).bitmap.rows * (*slot).bitmap.pitch.unsigned_abs() as u32) as usize;
         let buf_copy = if bmp_len > 0 && !(*slot).bitmap.buffer.is_null() {
-            let mut v = Vec::with_capacity(bmp_len);
-            v.set_len(bmp_len);
-            ptr::copy_nonoverlapping((*slot).bitmap.buffer, v.as_mut_ptr(), bmp_len);
-            Box::into_raw(v.into_boxed_slice()) as *mut u8
+            let ptr = calloc(bmp_len, 1) as *mut u8;
+            if !ptr.is_null() {
+                ptr::copy_nonoverlapping((*slot).bitmap.buffer, ptr, bmp_len);
+            }
+            ptr
         } else {
             ptr::null_mut()
         };
@@ -1633,6 +1649,26 @@ pub unsafe extern "C" fn FT_Get_Glyph(
         return 0;
     }
 
+    let n_pts = (*slot).outline.n_points as usize;
+    let n_cont = (*slot).outline.n_contours as usize;
+    let (pts_copy, tags_copy, cont_copy) = if n_pts > 0 && !(*slot).outline.points.is_null() {
+        let p_buf = calloc(n_pts, std::mem::size_of::<FT_Vector>()) as *mut FT_Vector;
+        let t_buf = calloc(n_pts, std::mem::size_of::<c_char>()) as *mut c_char;
+        let c_buf = calloc(n_cont, std::mem::size_of::<c_short>()) as *mut c_short;
+        if !p_buf.is_null() {
+            ptr::copy_nonoverlapping((*slot).outline.points, p_buf, n_pts);
+        }
+        if !t_buf.is_null() {
+            ptr::copy_nonoverlapping((*slot).outline.tags, t_buf, n_pts);
+        }
+        if !c_buf.is_null() && n_cont > 0 && !(*slot).outline.contours.is_null() {
+            ptr::copy_nonoverlapping((*slot).outline.contours, c_buf, n_cont);
+        }
+        (p_buf, t_buf, c_buf)
+    } else {
+        (ptr::null_mut(), ptr::null_mut(), ptr::null_mut())
+    };
+
     let og = Box::new(FT_OutlineGlyphRec {
         root: FT_GlyphRec {
             library: (*slot).library,
@@ -1640,7 +1676,14 @@ pub unsafe extern "C" fn FT_Get_Glyph(
             format: FT_GLYPH_FORMAT_OUTLINE,
             advance: (*slot).advance,
         },
-        outline: (*slot).outline,
+        outline: FT_Outline {
+            n_contours: (*slot).outline.n_contours,
+            n_points: (*slot).outline.n_points,
+            points: pts_copy,
+            tags: tags_copy,
+            contours: cont_copy,
+            flags: (*slot).outline.flags,
+        },
     });
     *aglyph = Box::into_raw(og) as *mut FT_GlyphRec;
     0
@@ -1650,19 +1693,173 @@ pub unsafe extern "C" fn FT_Get_Glyph(
 pub unsafe extern "C" fn FT_Glyph_To_Bitmap(
     the_glyph: *mut *mut FT_GlyphRec,
     _render_mode: c_uint,
-    _origin: *mut FT_Vector,
+    origin: *mut FT_Vector,
     destroy: c_int,
 ) -> c_int {
     if the_glyph.is_null() || (*the_glyph).is_null() {
         return 1;
     }
-    if (**the_glyph).format == FT_GLYPH_FORMAT_BITMAP {
+    let glyph = *the_glyph;
+    if (*glyph).format == FT_GLYPH_FORMAT_BITMAP {
         return 0;
     }
-    if destroy != 0 {
-        FT_Done_Glyph(*the_glyph);
-        *the_glyph = ptr::null_mut();
+    if (*glyph).format != FT_GLYPH_FORMAT_OUTLINE {
+        return 1;
     }
+
+    let og = glyph as *mut FT_OutlineGlyphRec;
+    let mut outline = (*og).outline;
+
+    if !origin.is_null() {
+        FT_Outline_Translate(&mut outline, (*origin).x, (*origin).y);
+    }
+
+    let mut cbox = FT_BBox { xMin: 0, yMin: 0, xMax: 0, yMax: 0 };
+    FT_Outline_Get_CBox(&mut outline, &mut cbox);
+
+    let n_points = outline.n_points as usize;
+    if n_points == 0 {
+        let bg = Box::new(FT_BitmapGlyphRec {
+            root: FT_GlyphRec {
+                library: (*glyph).library,
+                clazz: ptr::null(),
+                format: FT_GLYPH_FORMAT_BITMAP,
+                advance: (*glyph).advance,
+            },
+            left: 0,
+            top: 0,
+            bitmap: FT_Bitmap {
+                rows: 0,
+                width: 0,
+                pitch: 0,
+                buffer: ptr::null_mut(),
+                num_grays: 256,
+                pixel_mode: FT_PIXEL_MODE_GRAY,
+                palette_mode: 0,
+                palette: ptr::null_mut(),
+            },
+        });
+        if destroy != 0 {
+            FT_Done_Glyph(glyph);
+        }
+        *the_glyph = Box::into_raw(bg) as *mut FT_GlyphRec;
+        return 0;
+    }
+
+    let pad = 1;
+    let left = ((cbox.xMin >> 6) as i32) - pad;
+    let top = (((cbox.yMax + 63) >> 6) as i32) + pad;
+    let right = (((cbox.xMax + 63) >> 6) as i32) + pad;
+    let bottom = ((cbox.yMin >> 6) as i32) - pad;
+    let width = (right - left).max(0) as usize;
+    let height = (top - bottom).max(0) as usize;
+    let pitch = ((width + 3) & !3) as usize;
+
+    let total_bytes = pitch * height;
+    let buf_ptr = if total_bytes > 0 {
+        calloc(total_bytes, 1) as *mut u8
+    } else {
+        ptr::null_mut()
+    };
+
+    let mut glyph_outline = GlyphOutline::new();
+    let pts = outline.points;
+    let tags = outline.tags;
+    let contours = outline.contours;
+    let n_contours = outline.n_contours as usize;
+
+    let left_f = left as f32;
+    let top_f = top as f32;
+
+    let mut start_idx = 0usize;
+    for c in 0..n_contours {
+        let end_idx = *contours.add(c) as usize;
+        if end_idx >= n_points || start_idx > end_idx {
+            break;
+        }
+
+        let p0 = pts.add(start_idx);
+        let px0 = ((*p0).x as f32 / 64.0) - left_f;
+        let py0 = top_f - ((*p0).y as f32 / 64.0);
+        glyph_outline.move_to(px0, py0);
+
+        let mut i = start_idx + 1;
+        while i <= end_idx {
+            let p = pts.add(i);
+            let tag = *tags.add(i);
+            let px = ((*p).x as f32 / 64.0) - left_f;
+            let py = top_f - ((*p).y as f32 / 64.0);
+
+            if (tag & 1) == 1 {
+                glyph_outline.line_to(px, py);
+                i += 1;
+            } else if (tag & 3) == 2 {
+                // Cubic off-curve
+                if i + 1 <= end_idx {
+                    let p2 = pts.add(i + 1);
+                    let p3 = if i + 2 <= end_idx { pts.add(i + 2) } else { pts.add(start_idx) };
+                    let c1x = px;
+                    let c1y = py;
+                    let c2x = ((*p2).x as f32 / 64.0) - left_f;
+                    let c2y = top_f - ((*p2).y as f32 / 64.0);
+                    let to_x = ((*p3).x as f32 / 64.0) - left_f;
+                    let to_y = top_f - ((*p3).y as f32 / 64.0);
+                    glyph_outline.cubic_to(c1x, c1y, c2x, c2y, to_x, to_y);
+                    i += 3;
+                } else {
+                    glyph_outline.line_to(px, py);
+                    i += 1;
+                }
+            } else {
+                // Conic quadratic off-curve
+                let to = if i + 1 <= end_idx { pts.add(i + 1) } else { pts.add(start_idx) };
+                let to_x = ((*to).x as f32 / 64.0) - left_f;
+                let to_y = top_f - ((*to).y as f32 / 64.0);
+                glyph_outline.quad_to(px, py, to_x, to_y);
+                i += 2;
+            }
+        }
+        glyph_outline.close();
+        start_idx = end_idx + 1;
+    }
+
+    if width > 0 && height > 0 && !buf_ptr.is_null() {
+        let rasterizer = QuartzRasterizer::new(width, height);
+        let base_bmp = rasterizer.rasterize(&glyph_outline);
+        let factor = compute_dilation_factor(12.0);
+        let dilated = dilate_mask(&base_bmp.buffer, width, height, factor);
+        for y in 0..height {
+            let src_off = y * width;
+            let dst_off = y * pitch;
+            ptr::copy_nonoverlapping(dilated.as_ptr().add(src_off), buf_ptr.add(dst_off), width);
+        }
+    }
+
+    let bg = Box::new(FT_BitmapGlyphRec {
+        root: FT_GlyphRec {
+            library: (*glyph).library,
+            clazz: ptr::null(),
+            format: FT_GLYPH_FORMAT_BITMAP,
+            advance: (*glyph).advance,
+        },
+        left,
+        top,
+        bitmap: FT_Bitmap {
+            rows: height as c_uint,
+            width: width as c_uint,
+            pitch: pitch as c_int,
+            buffer: buf_ptr,
+            num_grays: 256,
+            pixel_mode: FT_PIXEL_MODE_GRAY,
+            palette_mode: 0,
+            palette: ptr::null_mut(),
+        },
+    });
+
+    if destroy != 0 {
+        FT_Done_Glyph(glyph);
+    }
+    *the_glyph = Box::into_raw(bg) as *mut FT_GlyphRec;
     0
 }
 
@@ -1674,13 +1871,24 @@ pub unsafe extern "C" fn FT_Done_Glyph(glyph: *mut FT_GlyphRec) {
     if (*glyph).format == FT_GLYPH_FORMAT_BITMAP {
         let bg = glyph as *mut FT_BitmapGlyphRec;
         if !(*bg).bitmap.buffer.is_null() {
-            let len = ((*bg).bitmap.rows * (*bg).bitmap.pitch.unsigned_abs() as u32) as usize;
-            let slice = slice::from_raw_parts_mut((*bg).bitmap.buffer, len);
-            let _ = Box::from_raw(slice as *mut [u8]);
+            free((*bg).bitmap.buffer as *mut c_void);
+            (*bg).bitmap.buffer = ptr::null_mut();
         }
         let _ = Box::from_raw(bg);
     } else {
         let og = glyph as *mut FT_OutlineGlyphRec;
+        if !(*og).outline.points.is_null() {
+            free((*og).outline.points as *mut c_void);
+            (*og).outline.points = ptr::null_mut();
+        }
+        if !(*og).outline.tags.is_null() {
+            free((*og).outline.tags as *mut c_void);
+            (*og).outline.tags = ptr::null_mut();
+        }
+        if !(*og).outline.contours.is_null() {
+            free((*og).outline.contours as *mut c_void);
+            (*og).outline.contours = ptr::null_mut();
+        }
         let _ = Box::from_raw(og);
     }
 }
@@ -1951,43 +2159,122 @@ pub unsafe extern "C" fn FT_Bitmap_Convert(
     let align = if alignment > 0 { alignment as usize } else { 1 };
     let src_w = (*source).width as usize;
     let src_h = (*source).rows as usize;
-    let target_pitch = ((src_w + align - 1) / align) * align;
-    let target_len = target_pitch * src_h;
 
-    let buffer_ptr = if target_len > 0 {
-        let ptr = calloc(target_len, 1) as *mut u8;
-        if ptr.is_null() {
-            return 1;
-        }
-        if !(*source).buffer.is_null() && src_w > 0 {
-            let src_pitch = (*source).pitch.unsigned_abs() as usize;
-            for y in 0..src_h {
-                let s_offset = y * src_pitch;
-                let d_offset = y * target_pitch;
-                let copy_w = src_w.min(src_pitch);
-                ptr::copy_nonoverlapping(
-                    (*source).buffer.add(s_offset),
-                    ptr.add(d_offset),
-                    copy_w,
-                );
+    if src_w == 0 || src_h == 0 {
+        *target = FT_Bitmap {
+            rows: 0,
+            width: 0,
+            pitch: 0,
+            buffer: ptr::null_mut(),
+            num_grays: 256,
+            pixel_mode: FT_PIXEL_MODE_GRAY,
+            palette_mode: 0,
+            palette: ptr::null_mut(),
+        };
+        return 0;
+    }
+
+    let src_pitch = (*source).pitch.unsigned_abs() as usize;
+
+    match (*source).pixel_mode {
+        FT_PIXEL_MODE_MONO => {
+            // Unpack 1-bit monochrome (1 bit/pixel) into 8-bit grayscale (0x00 or 0xFF)
+            let target_pitch = ((src_w + align - 1) / align) * align;
+            let target_len = target_pitch * src_h;
+            let ptr = calloc(target_len, 1) as *mut u8;
+            if ptr.is_null() {
+                return 1;
             }
+            if !(*source).buffer.is_null() {
+                for y in 0..src_h {
+                    let src_row = (*source).buffer.add(y * src_pitch);
+                    let dst_row = ptr.add(y * target_pitch);
+                    for x in 0..src_w {
+                        let byte = *src_row.add(x / 8);
+                        let bit = (byte >> (7 - (x % 8))) & 1;
+                        *dst_row.add(x) = if bit != 0 { 0xFF } else { 0x00 };
+                    }
+                }
+            }
+            *target = FT_Bitmap {
+                rows: (*source).rows,
+                width: (*source).width,
+                pitch: target_pitch as c_int,
+                buffer: ptr,
+                num_grays: 256,
+                pixel_mode: FT_PIXEL_MODE_GRAY,
+                palette_mode: 0,
+                palette: ptr::null_mut(),
+            };
+            0
         }
-        ptr
-    } else {
-        ptr::null_mut()
-    };
+        FT_PIXEL_MODE_BGRA => {
+            // 4 bytes per pixel color bitmap
+            let row_bytes = src_w * 4;
+            let target_pitch = ((row_bytes + align - 1) / align) * align;
+            let target_len = target_pitch * src_h;
+            let ptr = calloc(target_len, 1) as *mut u8;
+            if ptr.is_null() {
+                return 1;
+            }
+            if !(*source).buffer.is_null() {
+                for y in 0..src_h {
+                    let s_offset = y * src_pitch;
+                    let d_offset = y * target_pitch;
+                    let copy_w = row_bytes.min(src_pitch);
+                    ptr::copy_nonoverlapping((*source).buffer.add(s_offset), ptr.add(d_offset), copy_w);
+                }
+            }
+            *target = FT_Bitmap {
+                rows: (*source).rows,
+                width: (*source).width,
+                pitch: target_pitch as c_int,
+                buffer: ptr,
+                num_grays: (*source).num_grays,
+                pixel_mode: FT_PIXEL_MODE_BGRA,
+                palette_mode: 0,
+                palette: ptr::null_mut(),
+            };
+            0
+        }
+        _ => {
+            // FT_PIXEL_MODE_GRAY or other 8-bit grayscale modes
+            let target_pitch = ((src_w + align - 1) / align) * align;
+            let target_len = target_pitch * src_h;
+            let ptr = calloc(target_len, 1) as *mut u8;
+            if ptr.is_null() {
+                return 1;
+            }
+            if !(*source).buffer.is_null() {
+                for y in 0..src_h {
+                    let s_offset = y * src_pitch;
+                    let d_offset = y * target_pitch;
+                    let copy_w = src_w.min(src_pitch);
+                    ptr::copy_nonoverlapping((*source).buffer.add(s_offset), ptr.add(d_offset), copy_w);
+                }
+            }
+            *target = FT_Bitmap {
+                rows: (*source).rows,
+                width: (*source).width,
+                pitch: target_pitch as c_int,
+                buffer: ptr,
+                num_grays: (*source).num_grays,
+                pixel_mode: FT_PIXEL_MODE_GRAY,
+                palette_mode: 0,
+                palette: ptr::null_mut(),
+            };
+            0
+        }
+    }
+}
 
-    *target = FT_Bitmap {
-        rows: (*source).rows,
-        width: (*source).width,
-        pitch: target_pitch as c_int,
-        buffer: buffer_ptr,
-        num_grays: (*source).num_grays,
-        pixel_mode: (*source).pixel_mode,
-        palette_mode: (*source).palette_mode,
-        palette: ptr::null_mut(),
-    };
-    0
+#[no_mangle]
+pub unsafe extern "C" fn FT_Bitmap_Copy(
+    library: *mut c_void,
+    source: *const FT_Bitmap,
+    target: *mut FT_Bitmap,
+) -> c_int {
+    FT_Bitmap_Convert(library, source, target, 1)
 }
 
 #[no_mangle]
@@ -2454,6 +2741,12 @@ mod tests {
             assert_eq!((*slot_a).format, FT_GLYPH_FORMAT_BITMAP);
             assert_eq!((*slot_a).bitmap.pitch % 4, 0); // 4-byte aligned stride
 
+            // Verify metrics synchronization and baseline consistency
+            assert_eq!((*slot_a).metrics.horiBearingX >> 6, (*slot_a).bitmap_left as c_long);
+            assert_eq!((*slot_a).metrics.horiBearingY >> 6, (*slot_a).bitmap_top as c_long);
+            assert_eq!((*slot_a).metrics.width >> 6, (*slot_a).bitmap.width as c_long);
+            assert_eq!((*slot_a).metrics.height >> 6, (*slot_a).bitmap.rows as c_long);
+
             // Test whitespace (empty glyph) handling
             let gid_space = FT_Get_Char_Index(face_inst, ' ' as c_ulong);
             assert_eq!(FT_Load_Glyph(face_inst, gid_space, FT_LOAD_DEFAULT), 0);
@@ -2462,11 +2755,85 @@ mod tests {
             assert_eq!((*slot_sp).format, FT_GLYPH_FORMAT_BITMAP);
             assert_eq!((*slot_sp).bitmap.width, 0);
             assert_eq!((*slot_sp).bitmap.rows, 0);
+            assert!((*slot_sp).advance.x > 0); // Advance width must be preserved!
+
+            // Test descender glyph ('g') baseline metric consistency
+            let gid_g = FT_Get_Char_Index(face_inst, 'g' as c_ulong);
+            if gid_g > 0 {
+                assert_eq!(FT_Load_Glyph(face_inst, gid_g, FT_LOAD_DEFAULT), 0);
+                let slot_g = (*face_inst).glyph;
+                assert_eq!(FT_Render_Glyph(slot_g, 0), 0);
+                assert_eq!((*slot_g).metrics.horiBearingX >> 6, (*slot_g).bitmap_left as c_long);
+                assert_eq!((*slot_g).metrics.horiBearingY >> 6, (*slot_g).bitmap_top as c_long);
+            }
+
+            // Test FT_Get_Glyph and FT_Glyph_To_Bitmap
+            assert_eq!(FT_Load_Glyph(face_inst, gid_a, FT_LOAD_DEFAULT), 0);
+            let mut glyph: *mut FT_GlyphRec = ptr::null_mut();
+            assert_eq!(FT_Get_Glyph(slot_a, &mut glyph), 0);
+            assert!(!glyph.is_null());
+            assert_eq!((*glyph).format, FT_GLYPH_FORMAT_OUTLINE);
+
+            assert_eq!(FT_Glyph_To_Bitmap(&mut glyph, 0, ptr::null_mut(), 1), 0);
+            assert!(!glyph.is_null());
+            assert_eq!((*glyph).format, FT_GLYPH_FORMAT_BITMAP);
+            let bg = glyph as *mut FT_BitmapGlyphRec;
+            assert!((*bg).bitmap.width > 0);
+            assert!((*bg).bitmap.rows > 0);
+            FT_Done_Glyph(glyph);
 
             assert_eq!(FT_Done_Face(face_inst), 0);
             assert_eq!(FT_Done_Face(face0), 0);
         }
 
         assert_eq!(FT_Done_FreeType(lib), 0);
+    }
+
+    #[test]
+    fn test_bitmap_mono_convert() {
+        // 8x2 1-bit monochrome bitmap
+        let mono_data: [u8; 2] = [0b10101010, 0b11001100];
+        let src = FT_Bitmap {
+            rows: 2,
+            width: 8,
+            pitch: 1,
+            buffer: mono_data.as_ptr() as *mut c_uchar,
+            num_grays: 2,
+            pixel_mode: FT_PIXEL_MODE_MONO,
+            palette_mode: 0,
+            palette: ptr::null_mut(),
+        };
+
+        let mut dst = FT_Bitmap {
+            rows: 0,
+            width: 0,
+            pitch: 0,
+            buffer: ptr::null_mut(),
+            num_grays: 0,
+            pixel_mode: 0,
+            palette_mode: 0,
+            palette: ptr::null_mut(),
+        };
+
+        unsafe {
+            assert_eq!(FT_Bitmap_Convert(ptr::null_mut(), &src, &mut dst, 4), 0);
+            assert_eq!(dst.pixel_mode, FT_PIXEL_MODE_GRAY);
+            assert_eq!(dst.num_grays, 256);
+            assert_eq!(dst.width, 8);
+            assert_eq!(dst.rows, 2);
+            assert_eq!(dst.pitch % 4, 0);
+
+            let row0 = slice::from_raw_parts(dst.buffer, 8);
+            assert_eq!(row0[0], 255);
+            assert_eq!(row0[1], 0);
+            assert_eq!(row0[2], 255);
+            assert_eq!(row0[3], 0);
+            assert_eq!(row0[4], 255);
+            assert_eq!(row0[5], 0);
+            assert_eq!(row0[6], 255);
+            assert_eq!(row0[7], 0);
+
+            assert_eq!(FT_Bitmap_Done(ptr::null_mut(), &mut dst), 0);
+        }
     }
 }

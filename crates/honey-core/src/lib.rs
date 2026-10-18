@@ -9,7 +9,7 @@ pub mod gamma;
 pub mod rasterizer;
 
 pub use dilation::{compute_dilation_factor, compute_ink_energy, dilate_mask};
-pub use font::{count_faces, HoneyFace};
+pub use font::{count_faces, GlyphMetrics, HoneyFace};
 pub use gamma::{blend_glyph_buffer, blend_linear, linear_to_srgb, srgb_to_linear};
 pub use rasterizer::{GlyphOutline, Point, QuartzRasterizer, RasterBitmap};
 pub use ttf_parser::OutlineBuilder;
