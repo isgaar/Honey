@@ -71,17 +71,20 @@ usage() {
 Honey
 
 Uso:
-  honey apply        Activa fontconfig y compatibilidad GTK/KDE/Electron
-  honey reset        Retira Honey y restaura configs originales conocidas
+  honey apply          Activa fontconfig y compatibilidad GTK/KDE/Electron
+  honey reset          Retira Honey y restaura configs originales conocidas
+  honey install-system Instala Honey Rust Core como reemplazo nativo de libfreetype.so.6 (sudo)
+  honey status-system  Muestra si el sistema ejecuta Honey Rust Core o FreeType
+  honey restore-system Restaura libfreetype.so.6 oficial de la distribucion (sudo)
   honey launch-electron COMANDO [ARGS] Abre cualquier app Electron con el render macOS de Honey
   honey launch-codium [RUTA] Abre Codium con el render macOS de Honey
   honey launch-code [RUTA] Abre VS Code con el render macOS de Honey
   honey launch-cursor [RUTA] Abre Cursor con el render macOS de Honey
-  honey status       Muestra estado y muestras de fontconfig
-  honey doctor       Revisa dependencias y rutas
-  honey paths        Muestra rutas usadas
-  honey version      Muestra la version
-  honey help         Muestra esta ayuda
+  honey status         Muestra estado y muestras de fontconfig
+  honey doctor         Revisa dependencias y rutas
+  honey paths          Muestra rutas usadas
+  honey version        Muestra la version
+  honey help           Muestra esta ayuda
 
 Honey no necesita sudo. Sus cambios viven en:
   ~/.config/fontconfig/conf.d/99-honey.conf
@@ -1046,6 +1049,121 @@ launch_codium() {
     "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
 }
 
+install_system() {
+    [[ $EUID -eq 0 ]] || die "El comando 'install-system' requiere privilegios de superusuario (ejecute con sudo)."
+
+    local shim_src="$ROOT_DIR/target/release/libhoney_shim.so"
+    if [[ ! -f "$shim_src" ]]; then
+        printf 'Compilando Honey Rust Core en perfil release...\n'
+        (cd "$ROOT_DIR" && cargo build --release -p honey-shim)
+    fi
+    [[ -f "$shim_src" ]] || die "No se encontro el binario compilado en $shim_src"
+
+    local backup_dir="/var/backups/honey"
+    mkdir -p "$backup_dir"
+
+    if command_exists dpkg-divert; then
+        local deb_lib="/usr/lib/x86_64-linux-gnu/libfreetype.so.6"
+        local deb_divert="/usr/lib/x86_64-linux-gnu/libfreetype.so.6.distrib"
+        local honey_target="/usr/lib/honey/libfreetype.so.6"
+
+        mkdir -p "/usr/lib/honey"
+        cp -f "$shim_src" "$honey_target"
+        chmod 755 "$honey_target"
+
+        if [[ ! -e "$deb_divert" && -e "$deb_lib" ]]; then
+            dpkg-divert --package honey-freetype --add --rename --divert "$deb_divert" "$deb_lib"
+        fi
+        ln -sf "$honey_target" "$deb_lib"
+        ldconfig
+        ok "Sustitucion completada via dpkg-divert en $deb_lib"
+    else
+        local dest_dir="/usr/local/lib"
+        [[ -d "/usr/local/lib64" ]] && dest_dir="/usr/local/lib64"
+        mkdir -p "$dest_dir"
+
+        cp -f "$shim_src" "$dest_dir/libhoney_shim.so"
+        ln -sf libhoney_shim.so "$dest_dir/libfreetype.so.6"
+        chmod 755 "$dest_dir/libhoney_shim.so"
+
+        local conf_file="/etc/ld.so.conf.d/00-honey.conf"
+        printf '%s\n' "$dest_dir" > "$conf_file"
+        chmod 644 "$conf_file"
+
+        ldconfig
+
+        local test_bin=""
+        for b in /usr/bin/fc-match /usr/bin/alacritty /usr/bin/codium; do
+            if [[ -x "$b" ]]; then test_bin="$b"; break; fi
+        done
+
+        if [[ -n "$test_bin" ]]; then
+            local resolved
+            resolved="$(ldd "$test_bin" 2>/dev/null | grep libfreetype.so.6 || true)"
+            ok "Prueba de enlace superada para $test_bin: $resolved"
+        fi
+        ok "Honey Rust Core instalado a nivel de sistema en $dest_dir/libfreetype.so.6"
+    fi
+}
+
+status_system() {
+    printf 'Estado del reemplazo de sistema de Honey:\n'
+    local conf_file="/etc/ld.so.conf.d/00-honey.conf"
+    local deb_divert="/usr/lib/x86_64-linux-gnu/libfreetype.so.6.distrib"
+    local active=false
+
+    if [[ -f "$conf_file" ]]; then
+        printf '  ld.so configuracion: %s -> %s\n' "$conf_file" "$(cat "$conf_file")"
+        active=true
+    fi
+    if [[ -f "$deb_divert" ]]; then
+        printf '  dpkg-divert activo: %s\n' "$deb_divert"
+        active=true
+    fi
+
+    printf '\nResolucion dinamica de ejecutables del sistema:\n'
+    for b in /usr/bin/fc-match /usr/bin/alacritty /usr/bin/codium /usr/bin/code; do
+        if [[ -x "$b" ]]; then
+            local res
+            res="$(ldd "$b" 2>/dev/null | grep libfreetype.so.6 || true)"
+            printf '  %-20s: %s\n' "$(basename "$b")" "${res:-No enlaza con FreeType}"
+        fi
+    done
+
+    if $active; then
+        ok "Motor tipografico activo: Honey Rust Core (Paridad Quartz)"
+    else
+        warn "Motor tipografico activo: FreeType original de la distribucion"
+    fi
+}
+
+restore_system() {
+    [[ $EUID -eq 0 ]] || die "El comando 'restore-system' requiere privilegios de superusuario (ejecute con sudo)."
+
+    local conf_file="/etc/ld.so.conf.d/00-honey.conf"
+    if [[ -f "$conf_file" ]]; then
+        rm -f "$conf_file"
+        ok "Retirado $conf_file"
+    fi
+
+    local dest_dir="/usr/local/lib"
+    [[ -d "/usr/local/lib64" ]] && dest_dir="/usr/local/lib64"
+    rm -f "$dest_dir/libhoney_shim.so" "$dest_dir/libfreetype.so.6"
+
+    if command_exists dpkg-divert; then
+        local deb_lib="/usr/lib/x86_64-linux-gnu/libfreetype.so.6"
+        local deb_divert="/usr/lib/x86_64-linux-gnu/libfreetype.so.6.distrib"
+        if [[ -e "$deb_divert" ]]; then
+            rm -f "$deb_lib"
+            dpkg-divert --package honey-freetype --remove --rename --divert "$deb_divert" "$deb_lib"
+            ok "Restaurado binario oficial de distribucion via dpkg-divert"
+        fi
+    fi
+
+    ldconfig
+    ok "Sistema restaurado al motor FreeType original de fabrica."
+}
+
 main() {
     local command_name="${1:-help}"
     shift || true
@@ -1053,6 +1171,9 @@ main() {
     case "$command_name" in
         apply) apply_profile ;;
         reset) reset_profile ;;
+        install-system) install_system "$@" ;;
+        status-system) status_system "$@" ;;
+        restore-system) restore_system "$@" ;;
         launch-electron) launch_electron "$@" ;;
         launch-code) launch_code "$@" ;;
         launch-cursor) launch_cursor "$@" ;;

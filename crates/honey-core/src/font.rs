@@ -109,6 +109,51 @@ impl<'a> HoneyFace<'a> {
         self.face.descender()
     }
 
+    /// Retrieve raw OpenType table bytes (e.g. b"GSUB", b"GPOS", b"head").
+    pub fn table_data(&self, tag: [u8; 4]) -> Option<&'a [u8]> {
+        self.face.raw_face().table(ttf_parser::Tag::from_bytes(&tag))
+    }
+
+    /// Retrieve the PostScript name of the font if available.
+    pub fn postscript_name(&self) -> Option<String> {
+        for name in self.face.names() {
+            if name.name_id == ttf_parser::name_id::POST_SCRIPT_NAME {
+                if let Some(s) = name.to_string() {
+                    return Some(s);
+                }
+            }
+        }
+        None
+    }
+
+    /// Retrieve the font family name if available.
+    pub fn family_name(&self) -> Option<String> {
+        for name in self.face.names() {
+            if name.name_id == ttf_parser::name_id::FAMILY {
+                if let Some(s) = name.to_string() {
+                    return Some(s);
+                }
+            }
+        }
+        None
+    }
+
+    /// Retrieve the glyph name if stored in post table.
+    pub fn glyph_name(&self, glyph_id: u32) -> Option<&str> {
+        self.face.glyph_name(GlyphId(glyph_id as u16))
+    }
+
+    /// Query the glyph design-unit bounding box (x_min, y_min, x_max, y_max).
+    pub fn glyph_bounding_box(&self, glyph_id: u32) -> Option<(i16, i16, i16, i16)> {
+        let bbox = self.face.glyph_bounding_box(GlyphId(glyph_id as u16))?;
+        Some((bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max))
+    }
+
+    /// Extract raw outline vectors for custom decomp or vector drawing.
+    pub fn outline_glyph<B: OutlineBuilder>(&self, glyph_id: u32, builder: &mut B) -> Option<()> {
+        self.face.outline_glyph(GlyphId(glyph_id as u16), builder).map(|_| ())
+    }
+
     /// Render a glyph with complete Quartz parity (anti-hinting, subpixel positioning, stem dilation).
     pub fn render_glyph(
         &self,

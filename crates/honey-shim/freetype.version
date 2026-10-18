@@ -1,0 +1,8 @@
+{
+    global:
+        FT_*;
+        honey_*;
+        cairo_show_glyphs;
+    local:
+        *;
+};

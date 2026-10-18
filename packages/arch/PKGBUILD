@@ -1,0 +1,23 @@
+# Maintainer: Ismael <isgaar>
+pkgname=honey-freetype
+pkgver=0.7.0
+pkgrel=1
+pkgdesc="Quartz-parity typography engine in Rust replacing libfreetype.so.6"
+arch=('x86_64')
+url="https://github.com/isgaar/Honey"
+license=('MIT')
+depends=('glibc' 'gcc-libs')
+makedepends=('rust' 'cargo')
+provides=('freetype2=2.13.2' 'libfreetype.so=6-64')
+conflicts=('freetype2')
+
+build() {
+    cd "$srcdir/Honey"
+    cargo build --release -p honey-shim
+}
+
+package() {
+    install -Dm755 "$srcdir/Honey/target/release/libhoney_shim.so" "$pkgdir/usr/lib/libfreetype.so.6.20.1"
+    ln -s libfreetype.so.6.20.1 "$pkgdir/usr/lib/libfreetype.so.6"
+    ln -s libfreetype.so.6 "$pkgdir/usr/lib/libfreetype.so"
+}

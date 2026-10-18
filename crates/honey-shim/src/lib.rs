@@ -1,18 +1,36 @@
 //! C ABI drop-in replacement library for low-level OS FreeType substitution.
 //!
 //! Exposes standard FreeType 2 structs and functions so that GTK, Qt, Cairo,
-//! and Chromium/Skia can link or preload directly against Honey's Quartz engine.
+//! HarfBuzz, and Chromium/Skia can link or preload directly against Honey's Quartz engine.
 
 #![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
-use honey_core::HoneyFace;
-use std::ffi::{c_char, c_int, c_long, c_uchar, c_uint, c_ushort, c_void, CStr, CString};
+use honey_core::{HoneyFace, OutlineBuilder};
+use std::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ulong, c_ushort, c_void, CStr, CString};
 use std::fs;
 use std::ptr;
 use std::slice;
+use std::sync::OnceLock;
 
 pub const FT_GLYPH_FORMAT_BITMAP: c_uint = 0x6269_746d; // 'bitm'
+pub const FT_GLYPH_FORMAT_OUTLINE: c_uint = 0x6f75_746c; // 'outl'
 pub const FT_PIXEL_MODE_GRAY: c_uchar = 2;
+
+pub const FT_LOAD_DEFAULT: c_int = 0;
+pub const FT_LOAD_NO_SCALE: c_int = 1 << 0;
+pub const FT_LOAD_NO_HINTING: c_int = 1 << 1;
+pub const FT_LOAD_RENDER: c_int = 1 << 2;
+pub const FT_LOAD_NO_BITMAP: c_int = 1 << 3;
+
+pub const FT_KERNING_DEFAULT: c_uint = 0;
+pub const FT_KERNING_UNFITTED: c_uint = 1;
+pub const FT_KERNING_UNSCALED: c_uint = 2;
+
+pub const FT_FACE_FLAG_SCALABLE: c_long = 1 << 0;
+pub const FT_FACE_FLAG_HORIZONTAL: c_long = 1 << 3;
+pub const FT_FACE_FLAG_KERNING: c_long = 1 << 6;
+pub const FT_FACE_FLAG_GLYPH_NAMES: c_long = 1 << 9;
 
 #[repr(C)]
 pub struct FT_Bitmap {
@@ -27,7 +45,7 @@ pub struct FT_Bitmap {
 }
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct FT_Glyph_Metrics {
     pub width: c_long,
     pub height: c_long,
@@ -40,10 +58,65 @@ pub struct FT_Glyph_Metrics {
 }
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct FT_Vector {
     pub x: c_long,
     pub y: c_long,
+}
+
+#[repr(C)]
+#[derive(Default, Copy, Clone)]
+pub struct FT_BBox {
+    pub xMin: c_long,
+    pub yMin: c_long,
+    pub xMax: c_long,
+    pub yMax: c_long,
+}
+
+#[repr(C)]
+#[derive(Default, Copy, Clone)]
+pub struct FT_Matrix {
+    pub xx: c_long,
+    pub xy: c_long,
+    pub yx: c_long,
+    pub yy: c_long,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct FT_Outline {
+    pub n_contours: c_short,
+    pub n_points: c_short,
+    pub points: *mut FT_Vector,
+    pub tags: *mut c_char,
+    pub contours: *mut c_short,
+    pub flags: c_int,
+}
+
+pub type FT_Outline_MoveToFunc =
+    Option<unsafe extern "C" fn(to: *const FT_Vector, user: *mut c_void) -> c_int>;
+pub type FT_Outline_LineToFunc =
+    Option<unsafe extern "C" fn(to: *const FT_Vector, user: *mut c_void) -> c_int>;
+pub type FT_Outline_ConicToFunc = Option<
+    unsafe extern "C" fn(control: *const FT_Vector, to: *const FT_Vector, user: *mut c_void) -> c_int,
+>;
+pub type FT_Outline_CubicToFunc = Option<
+    unsafe extern "C" fn(
+        control1: *const FT_Vector,
+        control2: *const FT_Vector,
+        to: *const FT_Vector,
+        user: *mut c_void,
+    ) -> c_int,
+>;
+
+#[repr(C)]
+pub struct FT_Outline_Funcs {
+    pub move_to: FT_Outline_MoveToFunc,
+    pub line_to: FT_Outline_LineToFunc,
+    pub conic_to: FT_Outline_ConicToFunc,
+    pub cubic_to: FT_Outline_CubicToFunc,
+    pub shift: c_int,
+    pub delta: c_long,
 }
 
 #[repr(C)]
@@ -61,6 +134,43 @@ pub struct FT_GlyphSlotRec {
     pub bitmap: FT_Bitmap,
     pub bitmap_left: c_int,
     pub bitmap_top: c_int,
+    pub outline: FT_Outline,
+    pub num_subglyphs: c_uint,
+    pub subglyphs: *mut c_void,
+    pub control_data: *mut c_void,
+    pub control_len: c_long,
+    pub lsb_delta: c_long,
+    pub rsb_delta: c_long,
+    pub other: *mut c_void,
+    pub internal: *mut c_void,
+}
+
+#[repr(C)]
+pub struct FT_CharMapRec {
+    pub face: *mut FT_FaceRec,
+    pub encoding: c_uint,
+    pub platform_id: c_ushort,
+    pub encoding_id: c_ushort,
+}
+
+#[repr(C)]
+pub struct FT_Size_Metrics {
+    pub x_ppem: c_ushort,
+    pub y_ppem: c_ushort,
+    pub x_scale: c_long,
+    pub y_scale: c_long,
+    pub ascender: c_long,
+    pub descender: c_long,
+    pub height: c_long,
+    pub max_advance: c_long,
+}
+
+#[repr(C)]
+pub struct FT_SizeRec {
+    pub face: *mut FT_FaceRec,
+    pub generic: [usize; 2],
+    pub metrics: FT_Size_Metrics,
+    pub internal: *mut c_void,
 }
 
 #[repr(C)]
@@ -75,12 +185,9 @@ pub struct FT_FaceRec {
     pub num_fixed_sizes: c_int,
     pub available_sizes: *mut c_void,
     pub num_charmaps: c_int,
-    pub charmaps: *mut c_void,
+    pub charmaps: *mut *mut FT_CharMapRec,
     pub generic: [usize; 2],
-    pub bbox_xMin: c_long,
-    pub bbox_yMin: c_long,
-    pub bbox_xMax: c_long,
-    pub bbox_yMax: c_long,
+    pub bbox: FT_BBox,
     pub units_per_EM: c_ushort,
     pub ascender: c_short,
     pub descender: c_short,
@@ -90,22 +197,143 @@ pub struct FT_FaceRec {
     pub underline_position: c_short,
     pub underline_thickness: c_short,
     pub glyph: *mut FT_GlyphSlotRec,
-    pub size: *mut c_void,
-    pub charmap: *mut c_void,
+    pub size: *mut FT_SizeRec,
+    pub charmap: *mut FT_CharMapRec,
 
-    // Internal context managed by Honey
-    pub internal_context: *mut FaceContext,
+    pub driver: *mut c_void,
+    pub memory: *mut c_void,
+    pub stream: *mut c_void,
+    pub sizes_list: [usize; 2],
+    pub autohint: [usize; 2],
+    pub extensions: *mut c_void,
+    pub internal: *mut FaceContext,
 }
 
-#[allow(non_camel_case_types)]
-type c_short = i16;
+#[repr(C)]
+pub struct FT_GlyphRec {
+    pub library: *mut c_void,
+    pub clazz: *const c_void,
+    pub format: c_uint,
+    pub advance: FT_Vector,
+}
 
-/// Internal state holding font bytes and current rasterization properties.
+#[repr(C)]
+pub struct FT_BitmapGlyphRec {
+    pub root: FT_GlyphRec,
+    pub left: c_int,
+    pub top: c_int,
+    pub bitmap: FT_Bitmap,
+}
+
+#[repr(C)]
+pub struct FT_OutlineGlyphRec {
+    pub root: FT_GlyphRec,
+    pub outline: FT_Outline,
+}
+
+/// Internal state holding font bytes, metrics, and rasterization properties.
 pub struct FaceContext {
     pub font_data: Vec<u8>,
     pub pixel_size: f32,
     pub last_bitmap_buffer: Vec<u8>,
+    pub outline_points: Vec<FT_Vector>,
+    pub outline_tags: Vec<c_char>,
+    pub outline_contours: Vec<c_short>,
+    pub charmap_obj: FT_CharMapRec,
+    pub charmaps_array: Vec<*mut FT_CharMapRec>,
+    pub size_obj: FT_SizeRec,
+    pub transform_matrix: Option<FT_Matrix>,
+    pub transform_delta: Option<FT_Vector>,
 }
+
+struct OutlineAccumulator {
+    points: Vec<FT_Vector>,
+    tags: Vec<c_char>,
+    contours: Vec<c_short>,
+    scale: f32,
+}
+
+impl OutlineAccumulator {
+    fn new(scale: f32) -> Self {
+        Self {
+            points: Vec::new(),
+            tags: Vec::new(),
+            contours: Vec::new(),
+            scale,
+        }
+    }
+}
+
+impl OutlineBuilder for OutlineAccumulator {
+    fn move_to(&mut self, x: f32, y: f32) {
+        if !self.points.is_empty() {
+            let last_idx = (self.points.len() - 1) as c_short;
+            if self.contours.last() != Some(&last_idx) {
+                self.contours.push(last_idx);
+            }
+        }
+        self.points.push(FT_Vector {
+            x: (x * self.scale * 64.0) as c_long,
+            y: (y * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(1); // On-curve
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.points.push(FT_Vector {
+            x: (x * self.scale * 64.0) as c_long,
+            y: (y * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(1); // On-curve
+    }
+
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        self.points.push(FT_Vector {
+            x: (x1 * self.scale * 64.0) as c_long,
+            y: (y1 * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(0); // Off-curve conic
+
+        self.points.push(FT_Vector {
+            x: (x * self.scale * 64.0) as c_long,
+            y: (y * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(1); // On-curve
+    }
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.points.push(FT_Vector {
+            x: (x1 * self.scale * 64.0) as c_long,
+            y: (y1 * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(2); // Off-curve cubic
+
+        self.points.push(FT_Vector {
+            x: (x2 * self.scale * 64.0) as c_long,
+            y: (y2 * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(2); // Off-curve cubic
+
+        self.points.push(FT_Vector {
+            x: (x * self.scale * 64.0) as c_long,
+            y: (y * self.scale * 64.0) as c_long,
+        });
+        self.tags.push(1); // On-curve
+    }
+
+    fn close(&mut self) {
+        if !self.points.is_empty() {
+            let last_idx = (self.points.len() - 1) as c_short;
+            if self.contours.last() != Some(&last_idx) {
+                self.contours.push(last_idx);
+            }
+        }
+    }
+}
+
+// =========================================================================
+// Honey Custom Diagnostic & Telemetry API
+// =========================================================================
 
 #[no_mangle]
 pub extern "C" fn honey_version() -> *const c_char {
@@ -168,6 +396,32 @@ pub extern "C" fn FT_Done_FreeType(library: *mut c_void) -> c_int {
 }
 
 #[no_mangle]
+pub extern "C" fn FT_New_Library(_memory: *mut c_void, alibrary: *mut *mut c_void) -> c_int {
+    FT_Init_FreeType(alibrary)
+}
+
+#[no_mangle]
+pub extern "C" fn FT_Done_Library(library: *mut c_void) -> c_int {
+    FT_Done_FreeType(library)
+}
+
+#[no_mangle]
+pub extern "C" fn FT_Reference_Library(library: *mut c_void) -> c_int {
+    let _ = library;
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn FT_Add_Default_Modules(library: *mut c_void) {
+    let _ = library;
+}
+
+#[no_mangle]
+pub extern "C" fn FT_Set_Default_Properties(library: *mut c_void) {
+    let _ = library;
+}
+
+#[no_mangle]
 pub extern "C" fn FT_New_Memory_Face(
     library: *mut c_void,
     file_base: *const c_uchar,
@@ -215,24 +469,54 @@ fn init_face_from_bytes(
     face_index: u32,
     aface: *mut *mut FT_FaceRec,
 ) -> c_int {
-    let (num_glyphs, units_per_em, ascender, descender) = match HoneyFace::from_slice(&font_bytes, face_index) {
-        Ok(f) => (
-            f.number_of_glyphs() as c_long,
-            f.units_per_em(),
-            f.ascender(),
-            f.descender(),
-        ),
-        Err(_) => return 3, // Unknown file format
-    };
+    let (num_glyphs, units_per_em, ascender, descender, family_name, style_name) =
+        match HoneyFace::from_slice(&font_bytes, face_index) {
+            Ok(f) => (
+                f.number_of_glyphs() as c_long,
+                f.units_per_em(),
+                f.ascender(),
+                f.descender(),
+                f.family_name().unwrap_or_else(|| "Honey Font".to_string()),
+                "Regular".to_string(),
+            ),
+            Err(_) => return 3, // Unknown file format
+        };
 
-    let context = Box::new(FaceContext {
+    let mut context = Box::new(FaceContext {
         font_data: font_bytes,
         pixel_size: 16.0,
         last_bitmap_buffer: Vec::new(),
+        outline_points: Vec::new(),
+        outline_tags: Vec::new(),
+        outline_contours: Vec::new(),
+        charmap_obj: FT_CharMapRec {
+            face: ptr::null_mut(),
+            encoding: 0x756e_6963, // FT_ENCODING_UNICODE ('unic')
+            platform_id: 3,        // Windows / Unicode
+            encoding_id: 1,
+        },
+        charmaps_array: Vec::new(),
+        size_obj: FT_SizeRec {
+            face: ptr::null_mut(),
+            generic: [0; 2],
+            metrics: FT_Size_Metrics {
+                x_ppem: 16,
+                y_ppem: 16,
+                x_scale: 0x10000,
+                y_scale: 0x10000,
+                ascender: (ascender as c_long) << 6,
+                descender: (descender as c_long) << 6,
+                height: ((ascender - descender) as c_long) << 6,
+                max_advance: 16 << 6,
+            },
+            internal: ptr::null_mut(),
+        },
+        transform_matrix: None,
+        transform_delta: None,
     });
 
     let slot = Box::new(FT_GlyphSlotRec {
-        library: ptr::null_mut(),
+        library: 0xCAFE_BABE as *mut c_void,
         face: ptr::null_mut(),
         next: ptr::null_mut(),
         glyph_index: 0,
@@ -254,16 +538,34 @@ fn init_face_from_bytes(
         },
         bitmap_left: 0,
         bitmap_top: 0,
+        outline: FT_Outline {
+            n_contours: 0,
+            n_points: 0,
+            points: ptr::null_mut(),
+            tags: ptr::null_mut(),
+            contours: ptr::null_mut(),
+            flags: 0x01,
+        },
+        num_subglyphs: 0,
+        subglyphs: ptr::null_mut(),
+        control_data: ptr::null_mut(),
+        control_len: 0,
+        lsb_delta: 0,
+        rsb_delta: 0,
+        other: ptr::null_mut(),
+        internal: ptr::null_mut(),
     });
 
-    let family = CString::new("Honey Font").unwrap().into_raw();
-    let style = CString::new("Regular").unwrap().into_raw();
+    let family = CString::new(family_name).unwrap_or_else(|_| CString::new("Font").unwrap()).into_raw();
+    let style = CString::new(style_name).unwrap_or_else(|_| CString::new("Regular").unwrap()).into_raw();
     let slot_raw = Box::into_raw(slot);
+
+    context.charmaps_array.push(&mut context.charmap_obj as *mut FT_CharMapRec);
 
     let face = Box::new(FT_FaceRec {
         num_faces: 1,
         face_index: face_index as c_long,
-        face_flags: 1 | (1 << 3), // FT_FACE_FLAG_SCALABLE | FT_FACE_FLAG_HORIZONTAL
+        face_flags: FT_FACE_FLAG_SCALABLE | FT_FACE_FLAG_HORIZONTAL | FT_FACE_FLAG_KERNING | FT_FACE_FLAG_GLYPH_NAMES,
         style_flags: 0,
         num_glyphs,
         family_name: family,
@@ -271,30 +573,49 @@ fn init_face_from_bytes(
         num_fixed_sizes: 0,
         available_sizes: ptr::null_mut(),
         num_charmaps: 1,
-        charmaps: ptr::null_mut(),
+        charmaps: context.charmaps_array.as_mut_ptr(),
         generic: [0; 2],
-        bbox_xMin: 0,
-        bbox_yMin: 0,
-        bbox_xMax: 0,
-        bbox_yMax: 0,
+        bbox: FT_BBox {
+            xMin: 0,
+            yMin: descender as c_long,
+            xMax: units_per_em as c_long,
+            yMax: ascender as c_long,
+        },
         units_per_EM: units_per_em,
         ascender,
         descender,
         height: ascender - descender,
-        max_advance_width: 0,
-        max_advance_height: 0,
+        max_advance_width: units_per_em as c_short,
+        max_advance_height: (ascender - descender) as c_short,
         underline_position: -100,
         underline_thickness: 50,
         glyph: slot_raw,
-        size: ptr::null_mut(),
-        charmap: ptr::null_mut(),
-        internal_context: Box::into_raw(context),
+        size: &mut context.size_obj as *mut FT_SizeRec,
+        charmap: &mut context.charmap_obj as *mut FT_CharMapRec,
+        driver: ptr::null_mut(),
+        memory: ptr::null_mut(),
+        stream: ptr::null_mut(),
+        sizes_list: [0; 2],
+        autohint: [0; 2],
+        extensions: ptr::null_mut(),
+        internal: Box::into_raw(context),
     });
 
     let face_raw = Box::into_raw(face);
     unsafe {
         (*slot_raw).face = face_raw;
+        let ctx = (*face_raw).internal;
+        (*ctx).charmap_obj.face = face_raw;
+        (*ctx).size_obj.face = face_raw;
         *aface = face_raw;
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn FT_Reference_Face(face: *mut FT_FaceRec) -> c_int {
+    if face.is_null() {
+        return 1;
     }
     0
 }
@@ -309,8 +630,8 @@ pub extern "C" fn FT_Done_Face(face: *mut FT_FaceRec) -> c_int {
         if !face_box.glyph.is_null() {
             let _ = Box::from_raw(face_box.glyph);
         }
-        if !face_box.internal_context.is_null() {
-            let _ = Box::from_raw(face_box.internal_context);
+        if !face_box.internal.is_null() {
+            let _ = Box::from_raw(face_box.internal);
         }
         if !face_box.family_name.is_null() {
             let _ = CString::from_raw(face_box.family_name);
@@ -338,9 +659,11 @@ pub extern "C" fn FT_Set_Pixel_Sizes(
     };
 
     unsafe {
-        let ctx = (*face).internal_context;
+        let ctx = (*face).internal;
         if !ctx.is_null() {
             (*ctx).pixel_size = target.max(4.0);
+            (*ctx).size_obj.metrics.x_ppem = (*ctx).pixel_size as c_ushort;
+            (*ctx).size_obj.metrics.y_ppem = (*ctx).pixel_size as c_ushort;
         }
     }
     0
@@ -362,9 +685,11 @@ pub extern "C" fn FT_Set_Char_Size(
     let px = pt * (dpi / 72.0);
 
     unsafe {
-        let ctx = (*face).internal_context;
+        let ctx = (*face).internal;
         if !ctx.is_null() {
             (*ctx).pixel_size = px.max(4.0);
+            (*ctx).size_obj.metrics.x_ppem = (*ctx).pixel_size as c_ushort;
+            (*ctx).size_obj.metrics.y_ppem = (*ctx).pixel_size as c_ushort;
         }
     }
     0
@@ -376,7 +701,7 @@ pub extern "C" fn FT_Get_Char_Index(face: *mut FT_FaceRec, charcode: c_ulong) ->
         return 0;
     }
     unsafe {
-        let ctx = (*face).internal_context;
+        let ctx = (*face).internal;
         if ctx.is_null() {
             return 0;
         }
@@ -389,32 +714,120 @@ pub extern "C" fn FT_Get_Char_Index(face: *mut FT_FaceRec, charcode: c_ulong) ->
     0
 }
 
-#[allow(non_camel_case_types)]
-type c_ulong = usize;
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_First_Char(face: *mut FT_FaceRec, agindex: *mut c_uint) -> c_ulong {
+    if face.is_null() {
+        if !agindex.is_null() {
+            *agindex = 0;
+        }
+        return 0;
+    }
+    FT_Get_Next_Char(face, 0, agindex)
+}
 
 #[no_mangle]
-pub extern "C" fn FT_Load_Glyph(
+pub unsafe extern "C" fn FT_Get_Next_Char(
     face: *mut FT_FaceRec,
-    glyph_index: c_uint,
-    _load_flags: c_int,
-) -> c_int {
+    char_code: c_ulong,
+    agindex: *mut c_uint,
+) -> c_ulong {
     if face.is_null() {
-        return 1;
-    }
-    unsafe {
-        let slot = (*face).glyph;
-        if !slot.is_null() {
-            (*slot).glyph_index = glyph_index;
-            (*slot).format = FT_GLYPH_FORMAT_BITMAP;
+        if !agindex.is_null() {
+            *agindex = 0;
         }
+        return 0;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        if !agindex.is_null() {
+            *agindex = 0;
+        }
+        return 0;
+    }
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        let start = (char_code as u32).saturating_add(1);
+        for code in start..=0x10FFFF {
+            if let Some(ch) = char::from_u32(code) {
+                if let Some(gid) = hf.glyph_index(ch) {
+                    if gid > 0 {
+                        if !agindex.is_null() {
+                            *agindex = gid;
+                        }
+                        return code as c_ulong;
+                    }
+                }
+            }
+        }
+    }
+    if !agindex.is_null() {
+        *agindex = 0;
     }
     0
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn FT_Load_Glyph(
+    face: *mut FT_FaceRec,
+    glyph_index: c_uint,
+    load_flags: c_int,
+) -> c_int {
+    if face.is_null() {
+        return 1;
+    }
+    let slot = (*face).glyph;
+    if slot.is_null() {
+        return 1;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 1;
+    }
+
+    (*slot).glyph_index = glyph_index;
+    let scale = (*ctx).pixel_size / ((*face).units_per_EM.max(1) as f32);
+
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        let mut accum = OutlineAccumulator::new(scale);
+        let _ = hf.outline_glyph(glyph_index, &mut accum);
+        accum.close();
+
+        (*ctx).outline_points = accum.points;
+        (*ctx).outline_tags = accum.tags;
+        (*ctx).outline_contours = accum.contours;
+
+        (*slot).outline.n_points = (*ctx).outline_points.len() as c_short;
+        (*slot).outline.n_contours = (*ctx).outline_contours.len() as c_short;
+        (*slot).outline.points = (*ctx).outline_points.as_mut_ptr();
+        (*slot).outline.tags = (*ctx).outline_tags.as_mut_ptr();
+        (*slot).outline.contours = (*ctx).outline_contours.as_mut_ptr();
+        (*slot).outline.flags = 0x01;
+
+        if let Some((x_min, y_min, x_max, y_max)) = hf.glyph_bounding_box(glyph_index) {
+            (*slot).metrics.width = (((x_max - x_min) as f32 * scale) * 64.0) as c_long;
+            (*slot).metrics.height = (((y_max - y_min) as f32 * scale) * 64.0) as c_long;
+            (*slot).metrics.horiBearingX = ((x_min as f32 * scale) * 64.0) as c_long;
+            (*slot).metrics.horiBearingY = ((y_max as f32 * scale) * 64.0) as c_long;
+        }
+
+        let adv = hf.glyph_hor_advance(glyph_index).unwrap_or(0) as f32 * scale;
+        (*slot).metrics.horiAdvance = (adv * 64.0) as c_long;
+        (*slot).linearHoriAdvance = (adv * 65536.0) as c_long;
+        (*slot).advance.x = (adv * 64.0) as c_long;
+        (*slot).advance.y = 0;
+        (*slot).format = FT_GLYPH_FORMAT_OUTLINE;
+
+        if (load_flags & FT_LOAD_RENDER) != 0 {
+            return FT_Render_Glyph(slot, 0);
+        }
+        return 0;
+    }
+    1
+}
+
+#[no_mangle]
 pub extern "C" fn FT_Load_Char(face: *mut FT_FaceRec, char_code: c_ulong, load_flags: c_int) -> c_int {
     let gid = FT_Get_Char_Index(face, char_code);
-    FT_Load_Glyph(face, gid, load_flags)
+    unsafe { FT_Load_Glyph(face, gid, load_flags) }
 }
 
 #[no_mangle]
@@ -427,7 +840,7 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
         if face.is_null() {
             return 1;
         }
-        let ctx = (*face).internal_context;
+        let ctx = (*face).internal;
         if ctx.is_null() {
             return 1;
         }
@@ -457,4 +870,1116 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
         }
     }
     1
+}
+
+// =========================================================================
+// OpenType Tables & Metadata Queries (HarfBuzz, Fontconfig, Cairo)
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Load_Sfnt_Table(
+    face: *mut FT_FaceRec,
+    tag: c_ulong,
+    offset: c_long,
+    buffer: *mut c_uchar,
+    length: *mut c_ulong,
+) -> c_int {
+    if face.is_null() || length.is_null() {
+        return 1;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 1;
+    }
+    let tag_u32 = tag as u32;
+    let tag_bytes = tag_u32.to_be_bytes();
+
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        if let Some(table) = hf.table_data(tag_bytes) {
+            let table_len = table.len();
+            if buffer.is_null() {
+                *length = table_len as c_ulong;
+                return 0;
+            }
+
+            let off = if offset > 0 { offset as usize } else { 0 };
+            if off >= table_len {
+                *length = 0;
+                return 0;
+            }
+
+            let available = table_len - off;
+            let to_copy = (*length as usize).min(available);
+            ptr::copy_nonoverlapping(table[off..].as_ptr(), buffer, to_copy);
+            *length = to_copy as c_ulong;
+            return 0;
+        }
+    }
+    0x85 // FT_Err_Table_Missing
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Sfnt_Table(face: *mut FT_FaceRec, _tag: c_uint) -> *mut c_void {
+    let _ = face;
+    ptr::null_mut()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Sfnt_Table_Info(
+    face: *mut FT_FaceRec,
+    table_index: c_uint,
+    tag: *mut c_ulong,
+    length: *mut c_ulong,
+) -> c_int {
+    if face.is_null() {
+        return 1;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 1;
+    }
+    let data = &(*ctx).font_data;
+    if data.len() < 12 {
+        return 1;
+    }
+    let num_tables = u16::from_be_bytes([data[4], data[5]]) as usize;
+    let idx = table_index as usize;
+    if idx >= num_tables {
+        return 1;
+    }
+    let rec_off = 12 + idx * 16;
+    if rec_off + 16 > data.len() {
+        return 1;
+    }
+    let tag_val = u32::from_be_bytes([data[rec_off], data[rec_off + 1], data[rec_off + 2], data[rec_off + 3]]);
+    let len_val = u32::from_be_bytes([data[rec_off + 12], data[rec_off + 13], data[rec_off + 14], data[rec_off + 15]]);
+
+    if !tag.is_null() {
+        *tag = tag_val as c_ulong;
+    }
+    if !length.is_null() {
+        *length = len_val as c_ulong;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Select_Charmap(face: *mut FT_FaceRec, encoding: c_uint) -> c_int {
+    if face.is_null() {
+        return 1;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 1;
+    }
+    (*ctx).charmap_obj.encoding = encoding;
+    (*face).charmap = &mut (*ctx).charmap_obj;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Set_Charmap(face: *mut FT_FaceRec, charmap: *mut FT_CharMapRec) -> c_int {
+    if face.is_null() || charmap.is_null() {
+        return 1;
+    }
+    (*face).charmap = charmap;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Charmap_Index(charmap: *mut FT_CharMapRec) -> c_int {
+    if charmap.is_null() {
+        return -1;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Kerning(
+    face: *mut FT_FaceRec,
+    left_glyph: c_uint,
+    right_glyph: c_uint,
+    _kern_mode: c_uint,
+    akerning: *mut FT_Vector,
+) -> c_int {
+    if face.is_null() || akerning.is_null() {
+        return 1;
+    }
+    (*akerning).x = 0;
+    (*akerning).y = 0;
+
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 0;
+    }
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        if let Some(kern_data) = hf.table_data(*b"kern") {
+            if kern_data.len() >= 18 {
+                let n_pairs = u16::from_be_bytes([kern_data[10], kern_data[11]]) as usize;
+                let mut pos = 18;
+                for _ in 0..n_pairs {
+                    if pos + 6 > kern_data.len() {
+                        break;
+                    }
+                    let left = u16::from_be_bytes([kern_data[pos], kern_data[pos + 1]]) as c_uint;
+                    let right = u16::from_be_bytes([kern_data[pos + 2], kern_data[pos + 3]]) as c_uint;
+                    let val = i16::from_be_bytes([kern_data[pos + 4], kern_data[pos + 5]]);
+                    if left == left_glyph && right == right_glyph {
+                        let scale = (*ctx).pixel_size / (hf.units_per_em().max(1) as f32);
+                        (*akerning).x = (val as f32 * scale * 64.0) as c_long;
+                        return 0;
+                    }
+                    pos += 6;
+                }
+            }
+        }
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Advance(
+    face: *mut FT_FaceRec,
+    gindex: c_uint,
+    _flags: c_int,
+    padvance: *mut c_long,
+) -> c_int {
+    if face.is_null() || padvance.is_null() {
+        return 1;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 1;
+    }
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        let upem = hf.units_per_em().max(1) as f32;
+        let scale = (*ctx).pixel_size / upem;
+        let adv = hf.glyph_hor_advance(gindex).unwrap_or(0) as f32 * scale;
+        *padvance = (adv * 64.0) as c_long;
+        return 0;
+    }
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Advances(
+    face: *mut FT_FaceRec,
+    start: c_uint,
+    count: c_uint,
+    flags: c_int,
+    padvances: *mut c_long,
+) -> c_int {
+    if face.is_null() || padvances.is_null() {
+        return 1;
+    }
+    for i in 0..count {
+        FT_Get_Advance(face, start + i, flags, padvances.add(i as usize));
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Font_Format(face: *mut FT_FaceRec) -> *const c_char {
+    let _ = face;
+    static FORMAT: &[u8] = b"TrueType\0";
+    FORMAT.as_ptr() as *const c_char
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_X11_Font_Format(face: *mut FT_FaceRec) -> *const c_char {
+    FT_Get_Font_Format(face)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Postscript_Name(face: *mut FT_FaceRec) -> *const c_char {
+    if face.is_null() {
+        return ptr::null();
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return (*face).family_name;
+    }
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        if let Some(ps) = hf.postscript_name() {
+            if let Ok(c_ps) = CString::new(ps) {
+                return c_ps.into_raw();
+            }
+        }
+    }
+    (*face).family_name
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Glyph_Name(
+    face: *mut FT_FaceRec,
+    glyph_index: c_uint,
+    buffer: *mut c_char,
+    buffer_max: c_uint,
+) -> c_int {
+    if face.is_null() || buffer.is_null() || buffer_max == 0 {
+        return 1;
+    }
+    let ctx = (*face).internal;
+    if ctx.is_null() {
+        return 1;
+    }
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        if let Some(name) = hf.glyph_name(glyph_index) {
+            let bytes = name.as_bytes();
+            let len = bytes.len().min(buffer_max as usize - 1);
+            ptr::copy_nonoverlapping(bytes.as_ptr(), buffer as *mut u8, len);
+            *buffer.add(len) = 0;
+            return 0;
+        }
+    }
+    let fallback = format!("g{}\0", glyph_index);
+    let bytes = fallback.as_bytes();
+    let len = bytes.len().min(buffer_max as usize);
+    ptr::copy_nonoverlapping(bytes.as_ptr(), buffer as *mut u8, len);
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Name_Index(
+    _face: *mut FT_FaceRec,
+    glyph_name: *const c_char,
+) -> c_uint {
+    if glyph_name.is_null() {
+        return 0;
+    }
+    let c_str = CStr::from_ptr(glyph_name);
+    if let Ok(s) = c_str.to_str() {
+        if let Some(rest) = s.strip_prefix('g') {
+            if let Ok(id) = rest.parse::<c_uint>() {
+                return id;
+            }
+        }
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Sfnt_Name_Count(_face: *mut FT_FaceRec) -> c_uint {
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Sfnt_Name(
+    _face: *mut FT_FaceRec,
+    _idx: c_uint,
+    _aname: *mut c_void,
+) -> c_int {
+    0
+}
+
+// =========================================================================
+// Outlines Decomposition & Vector Geometries (Cairo, Skia)
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Decompose(
+    outline: *mut FT_Outline,
+    func_interface: *const FT_Outline_Funcs,
+    user_data: *mut c_void,
+) -> c_int {
+    if outline.is_null() || func_interface.is_null() {
+        return 1;
+    }
+    let n_contours = (*outline).n_contours as usize;
+    let n_points = (*outline).n_points as usize;
+    if n_contours == 0 || n_points == 0 {
+        return 0;
+    }
+    let points = (*outline).points;
+    let tags = (*outline).tags;
+    let contours = (*outline).contours;
+    if points.is_null() || tags.is_null() || contours.is_null() {
+        return 1;
+    }
+
+    let move_to = (*func_interface).move_to;
+    let line_to = (*func_interface).line_to;
+    let conic_to = (*func_interface).conic_to;
+    let cubic_to = (*func_interface).cubic_to;
+
+    let mut start_idx = 0usize;
+    for c in 0..n_contours {
+        let end_idx = *contours.add(c) as usize;
+        if end_idx >= n_points || start_idx > end_idx {
+            break;
+        }
+
+        let first_pt = points.add(start_idx);
+        if let Some(f) = move_to {
+            let res = f(first_pt, user_data);
+            if res != 0 {
+                return res;
+            }
+        }
+
+        let mut idx = start_idx + 1;
+        while idx <= end_idx {
+            let tag = (*tags.add(idx) as u8) & 0x03;
+            if tag == 1 {
+                if let Some(f) = line_to {
+                    let res = f(points.add(idx), user_data);
+                    if res != 0 {
+                        return res;
+                    }
+                }
+                idx += 1;
+            } else if tag == 0 {
+                let ctrl = points.add(idx);
+                idx += 1;
+                let to = if idx <= end_idx { points.add(idx) } else { first_pt };
+                if let Some(f) = conic_to {
+                    let res = f(ctrl, to, user_data);
+                    if res != 0 {
+                        return res;
+                    }
+                }
+                idx += 1;
+            } else if tag == 2 {
+                let ctrl1 = points.add(idx);
+                idx += 1;
+                if idx <= end_idx {
+                    let ctrl2 = points.add(idx);
+                    idx += 1;
+                    let to = if idx <= end_idx { points.add(idx) } else { first_pt };
+                    if let Some(f) = cubic_to {
+                        let res = f(ctrl1, ctrl2, to, user_data);
+                        if res != 0 {
+                            return res;
+                        }
+                    }
+                    idx += 1;
+                }
+            } else {
+                idx += 1;
+            }
+        }
+        start_idx = end_idx + 1;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Get_BBox(
+    outline: *mut FT_Outline,
+    abbox: *mut FT_BBox,
+) -> c_int {
+    if outline.is_null() || abbox.is_null() {
+        return 1;
+    }
+    let n_points = (*outline).n_points as usize;
+    if n_points == 0 {
+        (*abbox).xMin = 0;
+        (*abbox).yMin = 0;
+        (*abbox).xMax = 0;
+        (*abbox).yMax = 0;
+        return 0;
+    }
+    let pts = (*outline).points;
+    if pts.is_null() {
+        return 1;
+    }
+    let mut min_x = (*pts).x;
+    let mut max_x = (*pts).x;
+    let mut min_y = (*pts).y;
+    let mut max_y = (*pts).y;
+    for i in 1..n_points {
+        let p = pts.add(i);
+        if (*p).x < min_x { min_x = (*p).x; }
+        if (*p).x > max_x { max_x = (*p).x; }
+        if (*p).y < min_y { min_y = (*p).y; }
+        if (*p).y > max_y { max_y = (*p).y; }
+    }
+    (*abbox).xMin = min_x;
+    (*abbox).yMin = min_y;
+    (*abbox).xMax = max_x;
+    (*abbox).yMax = max_y;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Get_CBox(
+    outline: *mut FT_Outline,
+    acbox: *mut FT_BBox,
+) -> c_int {
+    FT_Outline_Get_BBox(outline, acbox)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Transform(
+    outline: *mut FT_Outline,
+    matrix: *const FT_Matrix,
+) {
+    if outline.is_null() || matrix.is_null() {
+        return;
+    }
+    let n_points = (*outline).n_points as usize;
+    let pts = (*outline).points;
+    if pts.is_null() {
+        return;
+    }
+    let xx = (*matrix).xx;
+    let xy = (*matrix).xy;
+    let yx = (*matrix).yx;
+    let yy = (*matrix).yy;
+
+    for i in 0..n_points {
+        let p = pts.add(i);
+        let x = (*p).x;
+        let y = (*p).y;
+        (*p).x = ((x * xx + y * xy) >> 16) as c_long;
+        (*p).y = ((x * yx + y * yy) >> 16) as c_long;
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Translate(
+    outline: *mut FT_Outline,
+    xOffset: c_long,
+    yOffset: c_long,
+) {
+    if outline.is_null() {
+        return;
+    }
+    let n_points = (*outline).n_points as usize;
+    let pts = (*outline).points;
+    if pts.is_null() {
+        return;
+    }
+    for i in 0..n_points {
+        let p = pts.add(i);
+        (*p).x += xOffset;
+        (*p).y += yOffset;
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_New(
+    _library: *mut c_void,
+    numPoints: c_uint,
+    numContours: c_uint,
+    anoutline: *mut FT_Outline,
+) -> c_int {
+    if anoutline.is_null() {
+        return 1;
+    }
+    let pts_buf = vec![FT_Vector::default(); numPoints as usize].into_boxed_slice();
+    let tags_buf = vec![0 as c_char; numPoints as usize].into_boxed_slice();
+    let contours_buf = vec![0 as c_short; numContours as usize].into_boxed_slice();
+
+    *anoutline = FT_Outline {
+        n_contours: numContours as c_short,
+        n_points: numPoints as c_short,
+        points: Box::into_raw(pts_buf) as *mut FT_Vector,
+        tags: Box::into_raw(tags_buf) as *mut c_char,
+        contours: Box::into_raw(contours_buf) as *mut c_short,
+        flags: 0x01,
+    };
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Done(_library: *mut c_void, outline: *mut FT_Outline) -> c_int {
+    if !outline.is_null() {
+        if !(*outline).points.is_null() {
+            let slice = slice::from_raw_parts_mut((*outline).points, (*outline).n_points as usize);
+            let _ = Box::from_raw(slice as *mut [FT_Vector]);
+            (*outline).points = ptr::null_mut();
+        }
+        if !(*outline).tags.is_null() {
+            let slice = slice::from_raw_parts_mut((*outline).tags, (*outline).n_points as usize);
+            let _ = Box::from_raw(slice as *mut [c_char]);
+            (*outline).tags = ptr::null_mut();
+        }
+        if !(*outline).contours.is_null() {
+            let slice = slice::from_raw_parts_mut((*outline).contours, (*outline).n_contours as usize);
+            let _ = Box::from_raw(slice as *mut [c_short]);
+            (*outline).contours = ptr::null_mut();
+        }
+    }
+    0
+}
+
+// =========================================================================
+// Independent Glyph Objects (FT_Glyph)
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Glyph(
+    slot: *mut FT_GlyphSlotRec,
+    aglyph: *mut *mut FT_GlyphRec,
+) -> c_int {
+    if slot.is_null() || aglyph.is_null() {
+        return 1;
+    }
+    if (*slot).format == FT_GLYPH_FORMAT_BITMAP {
+        let bmp_len = ((*slot).bitmap.rows * (*slot).bitmap.pitch.unsigned_abs() as u32) as usize;
+        let buf_copy = if bmp_len > 0 && !(*slot).bitmap.buffer.is_null() {
+            let mut v = Vec::with_capacity(bmp_len);
+            v.set_len(bmp_len);
+            ptr::copy_nonoverlapping((*slot).bitmap.buffer, v.as_mut_ptr(), bmp_len);
+            Box::into_raw(v.into_boxed_slice()) as *mut u8
+        } else {
+            ptr::null_mut()
+        };
+
+        let bg = Box::new(FT_BitmapGlyphRec {
+            root: FT_GlyphRec {
+                library: (*slot).library,
+                clazz: ptr::null(),
+                format: FT_GLYPH_FORMAT_BITMAP,
+                advance: (*slot).advance,
+            },
+            left: (*slot).bitmap_left,
+            top: (*slot).bitmap_top,
+            bitmap: FT_Bitmap {
+                rows: (*slot).bitmap.rows,
+                width: (*slot).bitmap.width,
+                pitch: (*slot).bitmap.pitch,
+                buffer: buf_copy,
+                num_grays: (*slot).bitmap.num_grays,
+                pixel_mode: (*slot).bitmap.pixel_mode,
+                palette_mode: 0,
+                palette: ptr::null_mut(),
+            },
+        });
+        *aglyph = Box::into_raw(bg) as *mut FT_GlyphRec;
+        return 0;
+    }
+
+    let og = Box::new(FT_OutlineGlyphRec {
+        root: FT_GlyphRec {
+            library: (*slot).library,
+            clazz: ptr::null(),
+            format: FT_GLYPH_FORMAT_OUTLINE,
+            advance: (*slot).advance,
+        },
+        outline: (*slot).outline,
+    });
+    *aglyph = Box::into_raw(og) as *mut FT_GlyphRec;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Glyph_To_Bitmap(
+    the_glyph: *mut *mut FT_GlyphRec,
+    _render_mode: c_uint,
+    _origin: *mut FT_Vector,
+    destroy: c_int,
+) -> c_int {
+    if the_glyph.is_null() || (*the_glyph).is_null() {
+        return 1;
+    }
+    if (**the_glyph).format == FT_GLYPH_FORMAT_BITMAP {
+        return 0;
+    }
+    if destroy != 0 {
+        FT_Done_Glyph(*the_glyph);
+        *the_glyph = ptr::null_mut();
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Done_Glyph(glyph: *mut FT_GlyphRec) {
+    if glyph.is_null() {
+        return;
+    }
+    if (*glyph).format == FT_GLYPH_FORMAT_BITMAP {
+        let bg = glyph as *mut FT_BitmapGlyphRec;
+        if !(*bg).bitmap.buffer.is_null() {
+            let len = ((*bg).bitmap.rows * (*bg).bitmap.pitch.unsigned_abs() as u32) as usize;
+            let slice = slice::from_raw_parts_mut((*bg).bitmap.buffer, len);
+            let _ = Box::from_raw(slice as *mut [u8]);
+        }
+        let _ = Box::from_raw(bg);
+    } else {
+        let og = glyph as *mut FT_OutlineGlyphRec;
+        let _ = Box::from_raw(og);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Glyph_Copy(
+    source: *mut FT_GlyphRec,
+    target: *mut *mut FT_GlyphRec,
+) -> c_int {
+    if source.is_null() || target.is_null() {
+        return 1;
+    }
+    FT_Get_Glyph(source as *mut FT_GlyphSlotRec, target)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Glyph_Transform(
+    glyph: *mut FT_GlyphRec,
+    matrix: *mut FT_Matrix,
+    delta: *mut FT_Vector,
+) -> c_int {
+    if glyph.is_null() {
+        return 1;
+    }
+    if (*glyph).format != FT_GLYPH_FORMAT_BITMAP {
+        let og = glyph as *mut FT_OutlineGlyphRec;
+        if !matrix.is_null() {
+            FT_Outline_Transform(&mut (*og).outline, matrix);
+        }
+        if !delta.is_null() {
+            FT_Outline_Translate(&mut (*og).outline, (*delta).x, (*delta).y);
+        }
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Glyph_Get_CBox(
+    glyph: *mut FT_GlyphRec,
+    _bbox_mode: c_uint,
+    acbox: *mut FT_BBox,
+) {
+    if glyph.is_null() || acbox.is_null() {
+        return;
+    }
+    if (*glyph).format == FT_GLYPH_FORMAT_BITMAP {
+        let bg = glyph as *mut FT_BitmapGlyphRec;
+        (*acbox).xMin = ((*bg).left as c_long) << 6;
+        (*acbox).yMax = ((*bg).top as c_long) << 6;
+        (*acbox).xMax = (*acbox).xMin + (((*bg).bitmap.width as c_long) << 6);
+        (*acbox).yMin = (*acbox).yMax - (((*bg).bitmap.rows as c_long) << 6);
+    } else {
+        let og = glyph as *mut FT_OutlineGlyphRec;
+        FT_Outline_Get_CBox(&mut (*og).outline, acbox);
+    }
+}
+
+// =========================================================================
+// Transforms, Geometry & Math
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Set_Transform(
+    face: *mut FT_FaceRec,
+    matrix: *mut FT_Matrix,
+    delta: *mut FT_Vector,
+) {
+    if face.is_null() {
+        return;
+    }
+    let ctx = (*face).internal;
+    if !ctx.is_null() {
+        (*ctx).transform_matrix = if !matrix.is_null() { Some(*matrix) } else { None };
+        (*ctx).transform_delta = if !delta.is_null() { Some(*delta) } else { None };
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Transform(
+    face: *mut FT_FaceRec,
+    matrix: *mut FT_Matrix,
+    delta: *mut FT_Vector,
+) {
+    if face.is_null() {
+        return;
+    }
+    let ctx = (*face).internal;
+    if !ctx.is_null() {
+        if !matrix.is_null() {
+            *matrix = (*ctx).transform_matrix.unwrap_or(FT_Matrix { xx: 0x10000, xy: 0, yx: 0, yy: 0x10000 });
+        }
+        if !delta.is_null() {
+            *delta = (*ctx).transform_delta.unwrap_or(FT_Vector { x: 0, y: 0 });
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn FT_MulFix(a: c_long, b: c_long) -> c_long {
+    let prod = (a as i128) * (b as i128);
+    let rounded = prod + 0x8000;
+    (rounded >> 16) as c_long
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Vector_Transform(vec: *mut FT_Vector, matrix: *const FT_Matrix) {
+    if vec.is_null() || matrix.is_null() {
+        return;
+    }
+    let x = (*vec).x;
+    let y = (*vec).y;
+    let xx = (*matrix).xx;
+    let xy = (*matrix).xy;
+    let yx = (*matrix).yx;
+    let yy = (*matrix).yy;
+    (*vec).x = ((x * xx + y * xy + 0x8000) >> 16) as c_long;
+    (*vec).y = ((x * yx + y * yy + 0x8000) >> 16) as c_long;
+}
+
+// =========================================================================
+// Library Version, Modules & Properties
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Library_Version(
+    _library: *mut c_void,
+    amajor: *mut c_int,
+    aminor: *mut c_int,
+    apatch: *mut c_int,
+) {
+    if !amajor.is_null() { *amajor = 2; }
+    if !aminor.is_null() { *aminor = 13; }
+    if !apatch.is_null() { *apatch = 2; }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Property_Set(
+    _library: *mut c_void,
+    _module_name: *const c_char,
+    _property_name: *const c_char,
+    _value: *const c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Property_Get(
+    _library: *mut c_void,
+    _module_name: *const c_char,
+    _property_name: *const c_char,
+    _value: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Library_SetLcdFilter(_library: *mut c_void, _filter: c_uint) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Library_SetLcdFilterWeights(
+    _library: *mut c_void,
+    _weights: *mut c_uchar,
+) -> c_int {
+    0
+}
+
+// =========================================================================
+// Sizes & Strikes
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_New_Size(
+    face: *mut FT_FaceRec,
+    asize: *mut *mut FT_SizeRec,
+) -> c_int {
+    if face.is_null() || asize.is_null() {
+        return 1;
+    }
+    let sz = Box::new(FT_SizeRec {
+        face,
+        generic: [0; 2],
+        metrics: FT_Size_Metrics {
+            x_ppem: 16,
+            y_ppem: 16,
+            x_scale: 0x10000,
+            y_scale: 0x10000,
+            ascender: 16 << 6,
+            descender: -4 << 6,
+            height: 20 << 6,
+            max_advance: 16 << 6,
+        },
+        internal: ptr::null_mut(),
+    });
+    *asize = Box::into_raw(sz);
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Done_Size(size: *mut FT_SizeRec) -> c_int {
+    if !size.is_null() {
+        let _ = Box::from_raw(size);
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Activate_Size(size: *mut FT_SizeRec) -> c_int {
+    if size.is_null() {
+        return 1;
+    }
+    let face = (*size).face;
+    if !face.is_null() {
+        (*face).size = size;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Select_Size(_face: *mut FT_FaceRec, _strike_index: c_int) -> c_int {
+    0
+}
+
+// =========================================================================
+// Bitmap Operations & Emboldening (Cairo)
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Bitmap_New(abitmap: *mut FT_Bitmap) {
+    if abitmap.is_null() {
+        return;
+    }
+    *abitmap = FT_Bitmap {
+        rows: 0,
+        width: 0,
+        pitch: 0,
+        buffer: ptr::null_mut(),
+        num_grays: 256,
+        pixel_mode: FT_PIXEL_MODE_GRAY,
+        palette_mode: 0,
+        palette: ptr::null_mut(),
+    };
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Bitmap_Done(
+    _library: *mut c_void,
+    bitmap: *mut FT_Bitmap,
+) -> c_int {
+    if !bitmap.is_null() && !(*bitmap).buffer.is_null() {
+        let len = ((*bitmap).rows * (*bitmap).pitch.unsigned_abs() as u32) as usize;
+        if len > 0 {
+            let slice = slice::from_raw_parts_mut((*bitmap).buffer, len);
+            let _ = Box::from_raw(slice as *mut [u8]);
+            (*bitmap).buffer = ptr::null_mut();
+        }
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Bitmap_Convert(
+    _library: *mut c_void,
+    source: *const FT_Bitmap,
+    target: *mut FT_Bitmap,
+    _alignment: c_int,
+) -> c_int {
+    if source.is_null() || target.is_null() {
+        return 1;
+    }
+    let len = ((*source).rows * (*source).pitch.unsigned_abs() as u32) as usize;
+    let mut buf = Vec::with_capacity(len);
+    buf.set_len(len);
+    if len > 0 && !(*source).buffer.is_null() {
+        ptr::copy_nonoverlapping((*source).buffer, buf.as_mut_ptr(), len);
+    }
+    *target = FT_Bitmap {
+        rows: (*source).rows,
+        width: (*source).width,
+        pitch: (*source).pitch,
+        buffer: Box::into_raw(buf.into_boxed_slice()) as *mut u8,
+        num_grays: (*source).num_grays,
+        pixel_mode: (*source).pixel_mode,
+        palette_mode: (*source).palette_mode,
+        palette: ptr::null_mut(),
+    };
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_GlyphSlot_Embolden(slot: *mut FT_GlyphSlotRec) {
+    if slot.is_null() {
+        return;
+    }
+    (*slot).advance.x += 1 << 6;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_GlyphSlot_Oblique(slot: *mut FT_GlyphSlotRec) {
+    if slot.is_null() {
+        return;
+    }
+    let matrix = FT_Matrix {
+        xx: 0x10000,
+        xy: 0x0366A,
+        yx: 0,
+        yy: 0x10000,
+    };
+    FT_Outline_Transform(&mut (*slot).outline, &matrix);
+}
+
+// =========================================================================
+// Multiple Masters & Variable Fonts Stubs
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_MM_Var(
+    _face: *mut FT_FaceRec,
+    amaster: *mut *mut c_void,
+) -> c_int {
+    if !amaster.is_null() {
+        *amaster = ptr::null_mut();
+    }
+    0x8F
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Done_MM_Var(
+    _library: *mut c_void,
+    _master: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Set_Var_Design_Coordinates(
+    _face: *mut FT_FaceRec,
+    _num_coords: c_uint,
+    _coords: *const c_long,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Var_Design_Coordinates(
+    _face: *mut FT_FaceRec,
+    _num_coords: c_uint,
+    _coords: *mut c_long,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Var_Blend_Coordinates(
+    _face: *mut FT_FaceRec,
+    _num_coords: c_uint,
+    _coords: *mut c_short,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Set_Named_Instance(
+    _face: *mut FT_FaceRec,
+    _instance_index: c_uint,
+) -> c_int {
+    0
+}
+
+// =========================================================================
+// Color Glyphs Fallback Stubs (COLR / CPAL)
+// =========================================================================
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Palette_Data_Get(_face: *mut FT_FaceRec, _apalette: *mut c_void) -> c_int {
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Palette_Select(
+    _face: *mut FT_FaceRec,
+    _palette_index: c_ushort,
+    _apalette: *mut *mut c_void,
+) -> c_int {
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Palette_Set_Foreground_Color(
+    _face: *mut FT_FaceRec,
+    _color: c_ulong,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Color_Glyph_ClipBox(
+    _face: *mut FT_FaceRec,
+    _base_glyph: c_uint,
+    _clip_box: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Color_Glyph_Layer(
+    _face: *mut FT_FaceRec,
+    _base_glyph: c_uint,
+    _glyph_index: *mut c_uint,
+    _color_index: *mut c_uint,
+    _iterator: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Color_Glyph_Paint(
+    _face: *mut FT_FaceRec,
+    _base_glyph: c_uint,
+    _root_transform: c_int,
+    _paint: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Colorline_Stops(
+    _face: *mut FT_FaceRec,
+    _color_stop: *mut c_void,
+    _iterator: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Paint(
+    _face: *mut FT_FaceRec,
+    _opaque_paint: *mut c_void,
+    _paint: *mut c_void,
+) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Paint_Layers(
+    _face: *mut FT_FaceRec,
+    _iterator: *mut c_void,
+    _paint: *mut c_void,
+) -> c_int {
+    0
+}
+
+// =========================================================================
+// Dynamic Interception Hook for Cairo (cairo_show_glyphs)
+// =========================================================================
+
+extern "C" {
+    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+}
+
+static CAIRO_MUTEX: OnceLock<Option<unsafe extern "C" fn(*mut c_void, *const c_void, c_int)>> =
+    OnceLock::new();
+
+#[no_mangle]
+pub unsafe extern "C" fn cairo_show_glyphs(
+    cr: *mut c_void,
+    glyphs: *const c_void,
+    num_glyphs: c_int,
+) {
+    let func = CAIRO_MUTEX.get_or_init(|| {
+        let sym_name = b"cairo_show_glyphs\0";
+        let handle = dlsym(-1isize as *mut c_void, sym_name.as_ptr() as *const c_char);
+        if !handle.is_null() && handle != cairo_show_glyphs as *mut c_void {
+            Some(std::mem::transmute(handle))
+        } else {
+            None
+        }
+    });
+
+    if let Some(real_cairo_show_glyphs) = func {
+        real_cairo_show_glyphs(cr, glyphs, num_glyphs);
+    }
 }

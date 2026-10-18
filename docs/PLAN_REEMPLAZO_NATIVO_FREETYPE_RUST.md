@@ -159,8 +159,9 @@ sudo honey restore-system
 | **M1** | Motor matematico y rasterizador analitico en Rust (`honey-core`) | **Completado y testeado** |
 | **M2** | Herramienta CLI de telemetria fotometrica en Rust (`honey-bench`) | **Completado (114M ops/s)** |
 | **M3** | Biblioteca de exportacion C ABI (`honey-shim`) | **Completado (`libhoney_shim`)** |
-| **M4** | Cobertura completa de la ABI de FreeType 2 (`FT_*` stubs + loader) | En desarrollo |
-| **M5** | Integracion con compositor Wayland (shader GLSL de mezcla lineal) | En desarrollo |
-| **M6** | Scripts de instalacion a nivel de sistema (`honey install-system`) | Planificado v0.8.0 |
+| **M4** | Cobertura completa de la ABI de FreeType 2 (`FT_*` completo + OpenType loader + vector outliner) | **Completado y validado (16/16 tests ABI en Linux)** |
+| **M5** | Integracion con compositor Wayland (shader GLSL de mezcla lineal `quad_linear_blend.frag`) | **Completado** |
+| **M6** | Gestion a nivel de sistema (`honey install-system`, `status-system`, `restore-system`, Arch/Deb/RPM) | **Completado e integrado** |
 
 Con este plan, Honey trasciende el rol de script de ajuste y se consolida como una alternativa tipografica nativa de nivel de sistema operativo para Linux.
+

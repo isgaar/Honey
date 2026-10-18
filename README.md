@@ -28,12 +28,16 @@ Honey trabaja en modo usuario: instala el comando `honey`, gestiona el perfil op
   - `honey-core`: motor analitico de rasterizacion, dilatacion optica y composicion lineal ($\gamma=1.0$).
   - `honey-bench`: CLI de telemetria fotometrica y rendimiento (procesamiento > 114M ops/s).
   - `honey-shim`: biblioteca compartida (`cdylib`) que expone la C ABI para reemplazo directo de `libfreetype.so.6`.
-- `native/`:
+- `native/`: prototipo y benchmarks en C.
+- `shaders/`: Shaders para compositores Wayland (`shaders/wayland/quad_linear_blend.frag`).
+- `packages/`: Plantillas de empaquetado para distribuciones (Arch Linux, Debian/Ubuntu y Fedora).
 - `examples/`:
   - `examples/check-rendering.sh`: script de diagnostico de fuentes.
   - `examples/test_freetype_client.c`: cliente de prueba en C que valida la sustitucion de FreeType 2 via `libhoney_shim`.
+  - `examples/test_comprehensive_abi.c`: suite exhaustiva de 16 pruebas de ABI contra fuentes reales de Linux.
 - `docs/`:
-  - `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md`: memoria tecnica de desarrollo en macOS y guia de transicion a Linux.
+  - `docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md`: memoria tecnica de desarrollo e implementacion en Linux.
+  - `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md`: memoria tecnica de investigacion en macOS Sequoia.
   - `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md`: plan maestro de reemplazo de FreeType a nivel de sistema.
   - `docs/QUARTZ_1_TO_1_PARITY.md`: analisis de ingenieria, telemetria empirica y paridad 1:1.
   - `docs/MATHEMATICAL_MODEL.md`: formulacion fotometrica, ecuaciones y curvas de dilatacion.
@@ -97,8 +101,33 @@ O abrelas normalmente desde tu lanzador de aplicaciones de escritorio tras ejecu
 
 ---
 
+## Reemplazo Nativo de FreeType a Nivel de Sistema Operativo
+
+Honey incluye un reemplazo binario drop-in para `libfreetype.so.6` implementado en Rust con paridad Quartz 1:1:
+
+```bash
+# Compilar el workspace de Rust
+cargo build --release
+
+# Validar compatibilidad binaria con las fuentes del sistema (16/16 checks)
+gcc -O3 $(pkg-config --cflags freetype2) examples/test_comprehensive_abi.c -Ltarget/release -lhoney_shim -o test_abi
+LD_LIBRARY_PATH=target/release ./test_abi
+
+# Instalar Honey como el motor de renderizado de fuentes oficial del sistema
+sudo honey install-system
+
+# Verificar que todas las aplicaciones enlazan contra Honey
+honey status-system
+
+# Revertir limpiamente en cualquier momento
+sudo honey restore-system
+```
+
+---
+
 ## Documentacion Tecnica
 
+- [Memoria Tecnica Desarrollo en Linux](docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md)
 - [Memoria Tecnica macOS y Transicion a Linux](docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md)
 - [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md)
 - [Paridad 1:1 con Quartz](docs/QUARTZ_1_TO_1_PARITY.md)

@@ -12,6 +12,7 @@ pub use dilation::{compute_dilation_factor, compute_ink_energy, dilate_mask};
 pub use font::HoneyFace;
 pub use gamma::{blend_glyph_buffer, blend_linear, linear_to_srgb, srgb_to_linear};
 pub use rasterizer::{GlyphOutline, Point, QuartzRasterizer, RasterBitmap};
+pub use ttf_parser::OutlineBuilder;
 
 /// Render a vector glyph outline with complete Quartz compositor parity:
 /// 1. Anti-hinted vector sampling (true Bezier contours).

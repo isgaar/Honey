@@ -7,11 +7,15 @@
 - Calibracion exacta de parametros de dilatacion optica (*stem darkening*) en FreeType (`cff:darkening-parameters` y `autofitter:darkening-parameters`) para replicar el incremento de +13.4% a +16.0% de absorcion energetica medido empiricamente en Quartz.
 - Incorporacion del motor nativo en **Rust** (`crates/honey-core`): rasterizador analitico fraccionario, dilatacion optica, decodificador vectorial de fuentes (`ttf-parser 0.25`) y composicion en gamma lineal ($\gamma = 1.0$) con rendimiento verificado de mas de 114 millones de operaciones por segundo.
 - Incorporacion de la herramienta CLI en Rust (`crates/honey-bench`) para benchmarking fotometrico y telemetria numerica de tinta.
-- Incorporacion de `crates/honey-shim` (`cdylib`): biblioteca con C ABI para drop-in replacement de `libfreetype.so.6`.
-- Incorporacion de `examples/test_freetype_client.c`: cliente de validacion en C real que carga fuentes del sistema via `libhoney_shim` y renderiza glifos Quartz.
-- Documento de memoria tecnica: `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md` con la bitacora de investigacion y guia paso a paso para continuar el desarrollo en Linux.
-- Documento maestro de arquitectura: `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md` para sustituir a FreeType directamente en el sistema operativo sin intermediarios ni parches.
-- Incorporacion de documentacion tecnica profunda: `QUARTZ_1_TO_1_PARITY.md`, `MATHEMATICAL_MODEL.md` y `NATIVE_ENGINE_SPECIFICATION.md`.
+- Incorporacion de `crates/honey-shim` (`cdylib`): biblioteca con C ABI completa para drop-in replacement de `libfreetype.so.6`.
+- Cobertura integral de la C ABI de FreeType 2 en Rust: decodificacion de tablas OpenType (`FT_Load_Sfnt_Table`, `FT_Sfnt_Table_Info`), descomposicion de contornos vectoriales Bezier (`FT_Outline_Decompose`), gestion desacoplada de objetos glifo (`FT_Get_Glyph`, `FT_Done_Glyph`), kerning, versionado e intercepcion dinamica de Cairo (`cairo_show_glyphs`).
+- Configuracion automatica de enlazado ELF con `SONAME libfreetype.so.6` y script de version ELF para sustitucion transparente en el cargador dinamico `ld.so`.
+- Integracion de cliente exhaustivo de pruebas en C (`examples/test_comprehensive_abi.c`) con 16 comprobaciones binarias superadas contra fuentes reales de Linux (`AdwaitaSans-Regular.ttf`).
+- Shaders de composicion fotometrica en gamma lineal ($\gamma = 1.0$) para compositores Wayland (`shaders/wayland/quad_linear_blend.frag`) compatibles con wlroots, Hyprland, Sway y KWin.
+- Comandos de gestion de sistema integrados en el CLI (`honey install-system`, `honey status-system`, `honey restore-system`).
+- Plantillas de empaquetado para distribuciones Linux: Arch Linux (`PKGBUILD`), Debian/Ubuntu (`dpkg-divert`) y Fedora (`honey-freetype.spec`).
+- Documentos de memoria tecnica: `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md` y `docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md`.
+- Documento maestro de arquitectura: `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md`.
 - Eliminacion de la intervencion invasiva de lanzadores de escritorio para VSCodium: se retiran el parcheo de `codium.desktop`, el lanzador secundario `codium-honey.desktop` y la generacion forzada de perfiles aislados en `~/.config/VSCodium-Honey`, respetando plenamente la configuracion nativa del usuario y sus extensiones.
 - Implementacion complementaria en C (`native/libhoney_quartz.c`).
 

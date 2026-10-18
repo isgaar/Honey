@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+LIB_DIR="/usr/lib/x86_64-linux-gnu"
+TARGET="$LIB_DIR/libfreetype.so.6"
+DIVERT="$LIB_DIR/libfreetype.so.6.distrib"
+HONEY_LIB="/usr/lib/honey/libhoney_shim.so"
+
+case "$1" in
+    configure)
+        if [ ! -e "$DIVERT" ] && [ -e "$TARGET" ]; then
+            dpkg-divert --package honey-freetype --add --rename --divert "$DIVERT" "$TARGET"
+        fi
+        ln -sf "$HONEY_LIB" "$TARGET"
+        ldconfig
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

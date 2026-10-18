@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+LIB_DIR="/usr/lib/x86_64-linux-gnu"
+TARGET="$LIB_DIR/libfreetype.so.6"
+DIVERT="$LIB_DIR/libfreetype.so.6.distrib"
+
+case "$1" in
+    remove|deconfigure)
+        rm -f "$TARGET"
+        if [ -e "$DIVERT" ]; then
+            dpkg-divert --package honey-freetype --remove --rename --divert "$DIVERT" "$TARGET"
+        fi
+        ldconfig
+        ;;
+    upgrade|failed-upgrade)
+        ;;
+    *)
+        echo "prerm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
