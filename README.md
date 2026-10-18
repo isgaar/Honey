@@ -23,14 +23,27 @@ Sustituir de raiz el paradigma tradicional de renderizado (FreeType y ClearType)
   - `honey-core`: Rasterizador analitico, calculo de dilatacion y pipeline fotometrico.
   - `honey-shim`: Biblioteca compartida (`cdylib`) que implementa la C ABI compatible con FreeType 2.13.2.
   - `honey-bench`: Telemetria y banco de pruebas de rendimiento.
-- `agents/`: Protocolos de gobernanza, topologia multi-agente e instrucciones globales ([agents/global-instructions.md](agents/global-instructions.md)).
-- `docs/`: Biblioteca de investigacion cientifica, planes tecnicos y manuales ([docs/README.md](docs/README.md)).
-  - `docs/articles/`: Articulos de investigacion formal y fundamentos matematicos.
-  - `docs/plan/`: Planes maestros de arquitectura, roadmap y metodologia clean-room.
-  - `docs/guides/`: Guias de instalacion, administracion y resolucion de incidentes.
-  - `docs/issues/`: Banco de pruebas y evidencias visuales activas.
+- `agents/`: Gobernanza, directivas globales y protocolo multi-agente:
+  - [agents/global-instructions.md](agents/global-instructions.md): Unico documento normativo de colaboracion, division de roles, reglas inmutables y estandares clean code.
+- `docs/`: Biblioteca de investigacion cientifica, planes tecnicos y guias operativas:
+  - `docs/articles/`: Articulos de investigacion formal y fundamentos matematicos:
+    - [Articulo I: Fundamentos Matematicos y Fisicos de Quartz](docs/articles/01_FUNDAMENTOS_QUARTZ_MATEMATICA.md)
+    - [Articulo II: Comparativa: Apple Quartz vs ClearType vs FreeType](docs/articles/02_COMPARATIVA_QUARTZ_FREETYPE_CLEARTYPE.md)
+    - [Articulo III: Ingenieria Inversa SkyLight, Metal 3 y WindowServer](docs/articles/03_INGENIERIA_INVERSA_SKYLIGHT_METAL.md)
+    - [Articulo IV: Toolkits Multiproceso, Electron y Compositores Wayland](docs/articles/04_TOOLKITS_ELECTRON_COMPOSITORES.md)
+    - [Articulo V: Pilas Tipograficas en GNOME y KDE Plasma](docs/articles/05_PILAS_TIPOGRAFICAS_GNOME_KDE.md)
+    - [Articulo VI: Arquitectura e Implementacion del Motor Honey en Rust](docs/articles/06_ARQUITECTURA_MOTOR_HONEY_RUST.md)
+  - `docs/plan/`: Planes maestros de arquitectura, roadmap y metodologia clean-room:
+    - [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/plan/PLAN_REEMPLAZO_NATIVO_FREETYPE.md)
+    - [Roadmap Tecnico de Hitos M1 a M8](docs/plan/ROADMAP_HITOS_Y_FASES.md)
+    - [Guia de Implementacion Clean-Room](docs/plan/GUIA_IMPLEMENTACION_CLEAN_ROOM.md)
+  - `docs/guides/`: Guias operativas de instalacion, administracion y soporte:
+    - [Instalacion y Despliegue en el Sistema](docs/guides/INSTALACION_Y_DESPLIEGUE.md)
+    - [Manual de Comandos CLI y Perfiles](docs/guides/GUIA_DE_USO_Y_COMANDOS.md)
+    - [Diagnostico y Resolucion de Problemas](docs/guides/DIAGNOSTICO_Y_RESOLUCION_PROBLEMAS.md)
+  - `docs/issues/`: Evidencias visuales activas (`docs/issues/captura_escritorio_navegadores.png`).
 - `bin/honey`: Herramienta CLI para administracion, verificacion de SELinux y conmutacion de perfiles.
-- `examples/`: Suites de validacion binaria C ABI (`test_comprehensive_abi.c`).
+- `examples/`: Suites de validacion binaria C ABI (`examples/test_comprehensive_abi.c`).
 
 ---
 
@@ -80,7 +93,7 @@ sudo ./bin/honey restore-system
 
 ## Gobernanza y Desarrollo
 
-El desarrollo se rige por las directivas establecidas en [agents/global-instructions.md](agents/global-instructions.md):
+El desarrollo se rige exclusivamente por las directivas establecidas en [agents/global-instructions.md](agents/global-instructions.md):
 - Coordinacion multi-agente (Arquitecto en macOS vs. Validador en Linux).
 - Politica estricta de cero emojis en todo el repositorio.
 - Uso exclusivo de rutas relativas en enlaces de documentacion.
