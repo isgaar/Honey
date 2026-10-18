@@ -112,18 +112,111 @@ LD_PRELOAD=./target/release/libhoney_shim.so alacritty
 
 ---
 
-## 4. Hojas de Ruta para las Siguientes Fases en Linux
+## 4. Pasos Detallados Pendientes de Implementacion en Linux
 
-### Fase 3: Integracion con Compositores Wayland (Linear Blending GPU)
-- Implementar un plugin de composicion o shader GLSL para compositores basados en **wlroots** (Sway, Hyprland, Wayfire) y **KWin** (KDE Plasma).
-- El shader recibe las texturas de ventanas con canal alfa de fuentes y ejecuta la mezcla lineal fotometrica en GPU mediante EGL/Vulkan antes de entregar los buffers al subsistema KMS/DRM.
+Esta seccion detalla de forma exhaustiva, tecnica y ejecutable los pasos que deben completarse al retomar el proyecto en un entorno Linux para consolidar el reemplazo definitivo de FreeType:
 
-### Fase 4: Despliegue de Sistema y Paquetes de Distribucion
-- **Arch Linux**: Crear un `PKGBUILD` para `honey-freetype` que proporcione `freetype2` en pacman (`provides=('freetype2=2.13.2')` y `conflicts=('freetype2')`).
-- **Debian / Ubuntu**: Crear script con `dpkg-divert` para desviar `/usr/lib/x86_64-linux-gnu/libfreetype.so.6` hacia el shim compilado en Rust.
-- **CLI Honey**: Implementar los comandos:
-  - `sudo honey install-system`: Respalda la biblioteca original y activa el enlace simbolico global.
-  - `sudo honey restore-system`: Revierte al FreeType de fabrica sin riesgos.
+### Paso 1: Completar la Cobertura de Simbolos de la ABI de FreeType 2 (`honey-shim`)
+Aunque `honey-shim` ya implementa las funciones de inicializacion, carga y rasterizacion (`FT_Init_FreeType`, `FT_New_Face`, `FT_Set_Pixel_Sizes`, `FT_Load_Char`, `FT_Render_Glyph`), bibliotecas como **HarfBuzz**, **Cairo** y **Pango** consultan funciones adicionales de consulta de tablas OpenType y metricas:
+
+1. **Funciones de Tablas y Metricas OpenType (usadas por HarfBuzz)**:
+   - `FT_Get_Sfnt_Table(face, tag)`: Debe retornar punteros a las tablas `'GSUB'`, `'GPOS'`, `'head'`, `'hmtx'` extrayendolas de `HoneyFace` mediante `ttf_parser::Face::raw_face()`.
+   - `FT_Select_Charmap(face, encoding)` y `FT_Set_Charmap(face, charmap)`: Asignacion de mapa de caracteres Unicode.
+   - `FT_Get_Kerning(face, left_glyph, right_glyph, kern_mode, akerning)`: Consulta de kerning tradicional para fuentes sin tabla GPOS.
+2. **Funciones de Extraccion de Contornos Vectoriales (usadas por Cairo y Skia)**:
+   - `FT_Outline_Decompose(outline, func_interface, user_data)`: Descompone los contornos Bezier para que Cairo o Skia puedan dibujar trazos o generar rutas en GPU.
+   - `FT_Outline_Get_BBox(outline, abbox)`: Calculo de caja delimitadora.
+3. **Funciones de Objetos Glyph Independientes**:
+   - `FT_Get_Glyph(slot, aglyph)`: Extrae una instancia desacoplada del glifo.
+   - `FT_Glyph_To_Bitmap(aglyph, render_mode, origin, destroy)`: Convierte el glifo vectorial a mapa de bits.
+   - `FT_Done_Glyph(glyph)`: Libera el objeto de glifo.
+4. **Propiedades y Versionado**:
+   - `FT_Library_Version(library, major, minor, patch)`: Retornar compatibilidad con FreeType 2.13.2 (major=2, minor=13, patch=2).
+   - `FT_Property_Set(library, module_name, property_name, value)`: Aceptar silenciosamente configuraciones de modulos sin error.
+
+### Paso 2: Configuracion de Soname `libfreetype.so.6` y Version Script ELF en Linux
+Para que el cargador dinamico de Linux (`ld.so`) acepte a `honey-shim` como reemplazo directo de la biblioteca de sistema:
+
+1. **Configurar Soname en `.cargo/config.toml`**:
+   Crear el archivo `.cargo/config.toml` en la raiz del workspace:
+   ```toml
+   [target.x86_64-unknown-linux-gnu]
+   rustflags = [
+       "-C", "link-arg=-Wl,-soname,libfreetype.so.6",
+       "-C", "link-arg=-Wl,--version-script=crates/honey-shim/freetype.version",
+   ]
+   ```
+2. **Definir Symbol Versioning (`freetype.version`)**:
+   Crear `crates/honey-shim/freetype.version` exportando las etiquetas de version ELF historicas de FreeType (`FREETYPE_2.0`, `FREETYPE_2.1.10`, etc.) para evitar advertencias de simbolos no versionados al ejecutar binarios de distribucion.
+
+### Paso 3: Hook de Composicion Lineal en Cairo (`cairo_show_glyphs`)
+FreeType rasteriza el glifo, pero Cairo realiza la composicion sobre la ventana. Para evitar que Cairo mezcle en sRGB no lineal en aplicaciones GTK:
+1. En `honey-shim`, interceptar la funcion publica `cairo_show_glyphs` via `dlsym(RTLD_NEXT, "cairo_show_glyphs")`.
+2. Verificar si la superficie de destino es un buffer de memoria de 32 bits (Xlib, XCB o Wayland shm).
+3. Redirigir el bucle de mezcla a `honey_core::gamma::blend_glyph_buffer`, garantizando que toda aplicacion GTK 3, GTK 4 y Firefox mezcle en gamma lineal ($\gamma = 1.0$) de forma transparente.
+
+### Paso 4: Shader de Mezcla Lineal para Compositores Wayland
+Para aplicaciones que renderizan mediante OpenGL/Vulkan directo o clientes Wayland puros (Chromium/Electron con Wayland nativo):
+1. Integrar el fragment shader GLSL documentado en `docs/NATIVE_ENGINE_SPECIFICATION.md` en compositores basados en **wlroots** (Sway, Hyprland, Wayfire).
+2. Punto de enganche en wlroots: archivo `render/gles2/shaders/quad.frag` o `render/vulkan/renderer.c`.
+3. Para KWin (KDE Plasma): Crear un plugin de efecto en `kwin/src/plugins/` que intercepte la pasada de dibujo de ventanas con canal alfa.
+
+### Paso 5: Implementacion del Comando de Sistema en el CLI (`bin/honey`)
+Extender `bin/honey` con comandos de administracion de sistema con privilegios:
+1. **`honey install-system`**:
+   - Requiere ejecucion con `sudo`.
+   - Crea un respaldo seguro del binario original en `/var/backups/honey/libfreetype.so.6.orig`.
+   - En sistemas con soporte `dpkg-divert` (Debian/Ubuntu), registra el desvio oficial.
+   - En sistemas Arch/Fedora, instala `libhoney_shim.so` en `/usr/local/lib/` y genera `/etc/ld.so.conf.d/00-honey.conf` con maxima prioridad, ejecutando `ldconfig`.
+   - Realiza una prueba de humo instantanea (`ldd $(which bash)` o `ldd $(which ls)` o test client) para certificar la estabilidad antes de consolidar.
+2. **`honey status-system`**:
+   - Inspecciona con `ldd` que biblioteca `libfreetype.so.6` estan resolviendo los ejecutables de usuario (`/usr/bin/alacritty`, `/usr/bin/codium`, etc.).
+   - Muestra si el motor activo es FreeType original o Honey Rust Core.
+3. **`honey restore-system`**:
+   - Restaura el binario original respaldado o retira el desvio de `dpkg-divert`.
+   - Ejecuta `ldconfig` y confirma el retorno al estado de fabrica.
+
+### Paso 6: Plantillas de Empaquetado para Distribuciones Linux
+
+#### A. Arch Linux (PKGBUILD para AUR / Repositorio Local)
+```bash
+pkgname=honey-freetype
+pkgver=0.7.0
+pkgrel=1
+pkgdesc="Quartz-parity typography engine in Rust replacing libfreetype.so.6"
+arch=('x86_64')
+url="https://github.com/isgaar/Honey"
+license=('MIT')
+depends=('glibc')
+makedepends=('rust' 'cargo')
+provides=('freetype2=2.13.2')
+conflicts=('freetype2')
+
+build() {
+    cd "$srcdir/Honey"
+    cargo build --release -p honey-shim
+}
+
+package() {
+    install -Dm755 "$srcdir/Honey/target/release/libhoney_shim.so" "$pkgdir/usr/lib/libfreetype.so.6.20.1"
+    ln -s libfreetype.so.6.20.1 "$pkgdir/usr/lib/libfreetype.so.6"
+    ln -s libfreetype.so.6 "$pkgdir/usr/lib/libfreetype.so"
+}
+```
+
+#### B. Debian / Ubuntu (Script de Divert)
+```bash
+sudo dpkg-divert --divert /usr/lib/x86_64-linux-gnu/libfreetype.so.6.distrib --rename /usr/lib/x86_64-linux-gnu/libfreetype.so.6
+sudo cp target/release/libhoney_shim.so /usr/lib/x86_64-linux-gnu/libfreetype.so.6
+sudo ldconfig
+```
+
+### Paso 7: Bateria de Pruebas de Regresion y Calidad en Linux
+Antes de considerar la sustitucion completa:
+1. **Prueba GTK 3 y GTK 4**: Ejecutar `gtk3-widget-factory` y `gtk4-widget-factory` con `LD_PRELOAD=./target/release/libhoney_shim.so` y validar que todos los pesos y etiquetas rendericen de forma suave.
+2. **Prueba Qt 6**: Ejecutar una aplicacion basada en Qt (Dolphin o Kate) y validar la ausencia de artefactos.
+3. **Prueba Electron**: Ejecutar VS Code / Cursor / Codium y validar la solidez del texto en Dark Mode sin banderas `--disable-lcd-text`.
+4. **Prueba de Rendimiento**: Comprobar que el framerate de scroll en navegadores (Firefox / Chrome) y editores se mantenga a 60 / 144 Hz sin caida de frames ni sobrecarga de CPU.
 
 ---
 
@@ -132,3 +225,4 @@ LD_PRELOAD=./target/release/libhoney_shim.so alacritty
 - **Cero emojis**: 100% verificado en todos los archivos de codigo fuente, scripts y documentacion.
 - **Compilacion**: 0 advertencias con `-Wall -Wextra` y `cargo build --release`.
 - **Ramas y remotos**: Sincronizado en `https://github.com/isgaar/Honey.git` en la rama `main`.
+
