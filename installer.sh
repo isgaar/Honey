@@ -178,16 +178,16 @@ prompt_install_mode() {
     printf '%b  Instalador de Honey Tipografia macOS Paridad Quartz v%s        %b\n' "$bold" "$APP_VERSION" "$reset"
     printf '%b=================================================================%b\n\n' "$bold" "$reset"
     printf 'Seleccione el metodo de instalacion deseado:\n\n'
-    printf '  %b1) Reemplazo Nativo de Bajo Nivel (Recomendado)%b\n' "$bold" "$reset"
-    printf '     - Sustituye libfreetype.so.6 con el motor Rust de Honey (cdylib).\n'
-    printf '     - Paridad analitica Quartz, dilatacion optica y gamma lineal pura.\n'
-    printf '     - Aplica a TODO el sistema operativo (GTK, Qt, Firefox, Electron).\n'
-    printf '     - Cero parches de configuracion; requiere privilegios sudo.\n\n'
-    printf '  %b2) Modo Tradicional de Usuario (Fontconfig y Parcheado)%b\n' "$bold" "$reset"
+    printf '  %b1) Modo Tradicional de Usuario (Recomendado y Seguro)%b\n' "$bold" "$reset"
     printf '     - Configura ~/.config/fontconfig/conf.d/99-honey.conf.\n'
     printf '     - Sincroniza variables FREETYPE_PROPERTIES en sesion y flags de Electron.\n'
     printf '     - Inyecta hojas de estilo en navegadores (Firefox userChrome.css).\n'
-    printf '     - No requiere privilegios de superusuario (sin sudo).\n\n'
+    printf '     - No requiere privilegios de superusuario (sin sudo) y es 100%% seguro.\n\n'
+    printf '  %b2) Reemplazo Nativo de Bajo Nivel (Avanzado / Experimental)%b\n' "$bold" "$reset"
+    printf '     - Sustituye libfreetype.so.6 con el motor Rust de Honey (cdylib).\n'
+    printf '     - Paridad analitica Quartz, dilatacion optica y gamma lineal pura.\n'
+    printf '     - Aplica a TODO el sistema operativo (GTK, Qt, Firefox, Electron).\n'
+    printf '     - Requiere privilegios sudo a nivel de sistema operativo.\n\n'
 
     local choice=""
     if [[ -t 0 ]]; then
@@ -198,11 +198,11 @@ prompt_install_mode() {
     fi
 
     case "$choice" in
-        1) install_native_mode ;;
-        2) install_user_mode ;;
+        1) install_user_mode ;;
+        2) install_native_mode ;;
         *)
-            warn "Opcion invalida: $choice. Usando opcion por defecto (1: Nativo)."
-            install_native_mode
+            warn "Opcion invalida: $choice. Usando opcion segura por defecto (1: Usuario)."
+            install_user_mode
             ;;
     esac
 }

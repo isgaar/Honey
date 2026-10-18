@@ -67,6 +67,11 @@ impl OutlineBuilder for OutlineCollector {
     }
 }
 
+/// Count number of font faces in font data (TTC collections or single fonts).
+pub fn count_faces(data: &[u8]) -> u32 {
+    ttf_parser::fonts_in_collection(data).unwrap_or(1)
+}
+
 /// A parsed font face backed by raw font memory.
 pub struct HoneyFace<'a> {
     face: Face<'a>,

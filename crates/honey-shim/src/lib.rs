@@ -11,7 +11,6 @@ use std::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ulong, c_ushor
 use std::fs;
 use std::ptr;
 use std::slice;
-use std::sync::OnceLock;
 
 pub const FT_GLYPH_FORMAT_BITMAP: c_uint = 0x6269_746d; // 'bitm'
 pub const FT_GLYPH_FORMAT_OUTLINE: c_uint = 0x6f75_746c; // 'outl'
@@ -435,7 +434,7 @@ pub extern "C" fn FT_New_Memory_Face(
     }
 
     let font_bytes = unsafe { slice::from_raw_parts(file_base, file_size as usize) }.to_vec();
-    init_face_from_bytes(font_bytes, face_index as u32, aface)
+    init_face_from_bytes(font_bytes, face_index, aface)
 }
 
 #[no_mangle]
@@ -461,16 +460,61 @@ pub extern "C" fn FT_New_Face(
         Err(_) => return 2, // Cannot open resource
     };
 
-    init_face_from_bytes(font_bytes, face_index as u32, aface)
+    init_face_from_bytes(font_bytes, face_index, aface)
 }
 
 fn init_face_from_bytes(
     font_bytes: Vec<u8>,
-    face_index: u32,
+    face_index: c_long,
     aface: *mut *mut FT_FaceRec,
 ) -> c_int {
+    let total_faces = honey_core::count_faces(&font_bytes) as c_long;
+
+    if face_index < 0 {
+        // FreeType specification: if face_index < 0, only return the number of faces
+        let face = Box::new(FT_FaceRec {
+            num_faces: total_faces,
+            face_index: -1,
+            face_flags: FT_FACE_FLAG_SCALABLE | FT_FACE_FLAG_HORIZONTAL,
+            style_flags: 0,
+            num_glyphs: 0,
+            family_name: ptr::null_mut(),
+            style_name: ptr::null_mut(),
+            num_fixed_sizes: 0,
+            available_sizes: ptr::null_mut(),
+            num_charmaps: 0,
+            charmaps: ptr::null_mut(),
+            generic: [0; 2],
+            bbox: FT_BBox::default(),
+            units_per_EM: 1000,
+            ascender: 800,
+            descender: -200,
+            height: 1000,
+            max_advance_width: 1000,
+            max_advance_height: 1000,
+            underline_position: -100,
+            underline_thickness: 50,
+            glyph: ptr::null_mut(),
+            size: ptr::null_mut(),
+            charmap: ptr::null_mut(),
+            driver: ptr::null_mut(),
+            memory: ptr::null_mut(),
+            stream: ptr::null_mut(),
+            sizes_list: [0; 2],
+            autohint: [0; 2],
+            extensions: ptr::null_mut(),
+            internal: ptr::null_mut(),
+        });
+
+        unsafe {
+            *aface = Box::into_raw(face);
+        }
+        return 0; // FT_Err_Ok
+    }
+
+    let actual_index = (face_index & 0xFFFF) as u32;
     let (num_glyphs, units_per_em, ascender, descender, family_name, style_name) =
-        match HoneyFace::from_slice(&font_bytes, face_index) {
+        match HoneyFace::from_slice(&font_bytes, actual_index) {
             Ok(f) => (
                 f.number_of_glyphs() as c_long,
                 f.units_per_em(),
@@ -563,8 +607,8 @@ fn init_face_from_bytes(
     context.charmaps_array.push(&mut context.charmap_obj as *mut FT_CharMapRec);
 
     let face = Box::new(FT_FaceRec {
-        num_faces: 1,
-        face_index: face_index as c_long,
+        num_faces: total_faces,
+        face_index,
         face_flags: FT_FACE_FLAG_SCALABLE | FT_FACE_FLAG_HORIZONTAL | FT_FACE_FLAG_KERNING | FT_FACE_FLAG_GLYPH_NAMES,
         style_flags: 0,
         num_glyphs,
@@ -631,7 +675,7 @@ pub extern "C" fn FT_Done_Face(face: *mut FT_FaceRec) -> c_int {
             let _ = Box::from_raw(face_box.glyph);
         }
         if !face_box.internal.is_null() {
-            let _ = Box::from_raw(face_box.internal);
+            let _ = Box::from_raw(face_box.internal as *mut FaceContext);
         }
         if !face_box.family_name.is_null() {
             let _ = CString::from_raw(face_box.family_name);
@@ -1951,35 +1995,47 @@ pub unsafe extern "C" fn FT_Get_Paint_Layers(
 ) -> c_int {
     0
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-// =========================================================================
-// Dynamic Interception Hook for Cairo (cairo_show_glyphs)
-// =========================================================================
+    #[test]
+    fn test_ft_new_face_query_count() {
+        let mut lib: *mut c_void = ptr::null_mut();
+        assert_eq!(FT_Init_FreeType(&mut lib), 0);
 
-extern "C" {
-    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
-}
-
-static CAIRO_MUTEX: OnceLock<Option<unsafe extern "C" fn(*mut c_void, *const c_void, c_int)>> =
-    OnceLock::new();
-
-#[no_mangle]
-pub unsafe extern "C" fn cairo_show_glyphs(
-    cr: *mut c_void,
-    glyphs: *const c_void,
-    num_glyphs: c_int,
-) {
-    let func = CAIRO_MUTEX.get_or_init(|| {
-        let sym_name = b"cairo_show_glyphs\0";
-        let handle = dlsym(-1isize as *mut c_void, sym_name.as_ptr() as *const c_char);
-        if !handle.is_null() && handle != cairo_show_glyphs as *mut c_void {
-            Some(std::mem::transmute(handle))
+        let font_path = if std::path::Path::new("/System/Library/Fonts/Supplemental/Arial.ttf").exists() {
+            "/System/Library/Fonts/Supplemental/Arial.ttf"
+        } else if std::path::Path::new("/Library/Fonts/Arial.ttf").exists() {
+            "/Library/Fonts/Arial.ttf"
         } else {
-            None
-        }
-    });
+            "/System/Library/Fonts/Menlo.ttc"
+        };
 
-    if let Some(real_cairo_show_glyphs) = func {
-        real_cairo_show_glyphs(cr, glyphs, num_glyphs);
+        let c_path = CString::new(font_path).unwrap();
+        let mut face: *mut FT_FaceRec = ptr::null_mut();
+
+        // Query mode: face_index = -1 (used by Fontconfig FcFreeTypeQueryFace)
+        let err = FT_New_Face(lib, c_path.as_ptr(), -1, &mut face);
+        assert_eq!(err, 0);
+        assert!(!face.is_null());
+        unsafe {
+            assert!((*face).num_faces >= 1);
+            assert_eq!((*face).face_index, -1);
+            assert_eq!(FT_Done_Face(face), 0);
+        }
+
+        // Standard mode: face_index = 0
+        let mut face0: *mut FT_FaceRec = ptr::null_mut();
+        let err0 = FT_New_Face(lib, c_path.as_ptr(), 0, &mut face0);
+        assert_eq!(err0, 0);
+        assert!(!face0.is_null());
+        unsafe {
+            assert!((*face0).num_faces >= 1);
+            assert_eq!((*face0).face_index, 0);
+            assert_eq!(FT_Done_Face(face0), 0);
+        }
+
+        assert_eq!(FT_Done_FreeType(lib), 0);
     }
 }

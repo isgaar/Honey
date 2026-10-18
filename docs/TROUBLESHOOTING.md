@@ -156,3 +156,26 @@ ls -la "$HOME/.local/state/honey/backups"
 
 Honey crea respaldos cuando encuentra un `99-honey.conf` previo que no fue
 generado por Honey.
+
+## Recuperacion si el sistema queda en pantalla negra tras install-system
+
+Si instalaste el reemplazo nativo a nivel de sistema (`install-system`) y el gestor de pantalla (GDM/SDDM) no inicia, quedando en pantalla negra con cursor:
+
+### Metodo 1: Terminal TTY (Recomendado)
+1. Presiona `Ctrl + Alt + F3` (o `Ctrl + Alt + F4` / `F5`) para cambiar a una consola virtual TTY.
+2. Ingresa tu usuario y contrasena.
+3. Ejecuta los comandos de restauracion inmediata:
+```bash
+sudo rm -f /etc/ld.so.conf.d/00-honey.conf
+sudo rm -f /usr/local/lib64/libhoney* /usr/local/lib64/libfreetype* /usr/local/lib/libhoney* /usr/local/lib/libfreetype*
+sudo ldconfig
+sudo systemctl restart gdm
+```
+(Si usas KDE Plasma, reemplaza `gdm` por `sddm`, o simplemente reinicia con `sudo reboot`).
+
+### Metodo 2: Modo de rescate desde GRUB
+1. Reinicia el equipo forzando el apagado si es necesario.
+2. En el menu de GRUB (manten pulsado `Shift` o presiona `Esc` al encender), selecciona Fedora y presiona `e` para editar.
+3. En la linea que empieza con `linux` o `linuxefi`, agrega un espacio y el numero `3` al final.
+4. Presiona `Ctrl + X` o `F10` para arrancar en modo texto.
+5. Inicia sesion y ejecuta los comandos del Metodo 1.
