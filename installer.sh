@@ -74,12 +74,14 @@ install_files() {
     cp -f "$SOURCE_DIR/installer.sh" "$INSTALL_DIR/installer.sh"
     cp -f "$SOURCE_DIR/CHANGELOG.md" "$INSTALL_DIR/CHANGELOG.md" 2>/dev/null || true
     cp -f "$SOURCE_DIR/LICENSE" "$INSTALL_DIR/LICENSE" 2>/dev/null || true
+    cp -f "$SOURCE_DIR/Cargo.toml" "$INSTALL_DIR/Cargo.toml" 2>/dev/null || true
 
     copy_tree "bin"
     copy_tree "config"
     copy_tree "docs"
     copy_tree "examples"
     copy_tree "native"
+    copy_tree "crates"
 
     chmod +x "$INSTALL_DIR/bin/honey"
     chmod +x "$INSTALL_DIR/installer.sh"

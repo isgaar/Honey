@@ -1,0 +1,9 @@
+[package]
+name = "honey-core"
+version = "0.7.0"
+edition = "2021"
+authors = ["Ismael <isgaar>"]
+description = "Core Quartz-parity typography and linear gamma rasterization engine in Rust"
+license = "MIT"
+
+[dependencies]

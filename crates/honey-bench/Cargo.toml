@@ -1,0 +1,10 @@
+[package]
+name = "honey-bench"
+version = "0.7.0"
+edition = "2021"
+authors = ["Ismael <isgaar>"]
+description = "Quartz parity telemetry and photometric benchmark CLI in Rust"
+license = "MIT"
+
+[dependencies]
+honey-core = { path = "../honey-core" }

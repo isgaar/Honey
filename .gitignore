@@ -21,4 +21,6 @@ native/*.so
 native/*.dylib
 native/*.o
 native/honey_raster_bench
+target/
+Cargo.lock
 

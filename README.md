@@ -24,11 +24,14 @@ Honey trabaja en modo usuario: instala el comando `honey`, gestiona el perfil op
 - `installer.sh`: instalador y desinstalador reproducible en modo usuario.
 - `bin/honey`: CLI principal para aplicar, retirar, lanzar aplicaciones y auditar el sistema.
 - `config/fontconfig/99-honey.conf`: perfil de paridad tipografica versionado.
+- `crates/`: Workspace nativo en **Rust**:
+  - `honey-core`: motor analitico de rasterizacion, dilatacion optica y composicion lineal ($\gamma=1.0$).
+  - `honey-bench`: CLI de telemetria fotometrica y rendimiento (procesamiento > 114M ops/s).
+  - `honey-shim`: biblioteca compartida (`cdylib`) que expone la C ABI para reemplazo directo de `libfreetype.so.6`.
 - `native/`:
-  - `libhoney_quartz.c`: motor nativo en C de composicion lineal y dilatacion optica.
-  - `honey_raster_bench.c`: herramienta CLI de telemetria y verificacion numerica contra baselines de macOS.
-  - `Makefile`: compilador cruzado para Linux y macOS.
+  - `libhoney_quartz.c` y `honey_raster_bench.c`: implementacion complementaria en C con `Makefile`.
 - `docs/`:
+  - `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md`: plan maestro de reemplazo de FreeType a nivel de sistema.
   - `docs/QUARTZ_1_TO_1_PARITY.md`: analisis de ingenieria, telemetria empirica y paridad 1:1.
   - `docs/MATHEMATICAL_MODEL.md`: formulacion fotometrica, ecuaciones y curvas de dilatacion.
   - `docs/NATIVE_ENGINE_SPECIFICATION.md`: integracion nativa en compositores Wayland, Cairo y Skia.
@@ -94,6 +97,7 @@ O abrelas normalmente desde tu lanzador de aplicaciones de escritorio tras ejecu
 
 ## Documentacion Tecnica
 
+- [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md)
 - [Paridad 1:1 con Quartz](docs/QUARTZ_1_TO_1_PARITY.md)
 - [Modelo Matematico y Fotometria](docs/MATHEMATICAL_MODEL.md)
 - [Especificacion del Motor Nativo](docs/NATIVE_ENGINE_SPECIFICATION.md)

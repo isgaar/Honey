@@ -1,0 +1,14 @@
+[package]
+name = "honey-shim"
+version = "0.7.0"
+edition = "2021"
+authors = ["Ismael <isgaar>"]
+description = "Native C ABI drop-in replacement library for low-level OS integration"
+license = "MIT"
+
+[lib]
+name = "honey_shim"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+honey-core = { path = "../honey-core" }
