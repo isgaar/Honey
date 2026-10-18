@@ -1995,6 +1995,248 @@ pub unsafe extern "C" fn FT_Get_Paint_Layers(
 ) -> c_int {
     0
 }
+
+// =========================================================================
+// Fontconfig, Cairo and HarfBuzz Required Symbols
+// =========================================================================
+
+#[repr(C)]
+pub struct PS_FontInfoRec {
+    pub version: *mut c_char,
+    pub notice: *mut c_char,
+    pub full_name: *mut c_char,
+    pub family_name: *mut c_char,
+    pub weight: *mut c_char,
+    pub italic_angle: c_long,
+    pub is_fixed_pitch: c_uchar,
+    pub underline_position: c_short,
+    pub underline_thickness: c_ushort,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_PS_Font_Info(
+    face: *mut FT_FaceRec,
+    afont_info: *mut PS_FontInfoRec,
+) -> c_int {
+    if face.is_null() || afont_info.is_null() {
+        return 1;
+    }
+    (*afont_info).version = ptr::null_mut();
+    (*afont_info).notice = ptr::null_mut();
+    (*afont_info).full_name = (*face).family_name;
+    (*afont_info).family_name = (*face).family_name;
+    (*afont_info).weight = (*face).style_name;
+    (*afont_info).italic_angle = 0;
+    (*afont_info).is_fixed_pitch = 0;
+    (*afont_info).underline_position = (*face).underline_position;
+    (*afont_info).underline_thickness = (*face).underline_thickness as c_ushort;
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_PS_Font_Private(
+    _face: *mut FT_FaceRec,
+    _afont_private: *mut c_void,
+) -> c_int {
+    6 // FT_Err_Invalid_Argument
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_PS_Font_Value(
+    _face: *mut FT_FaceRec,
+    _key: c_uint,
+    _idx: c_uint,
+    _value: *mut c_void,
+    _value_len: c_long,
+) -> c_long {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Has_PS_Glyph_Names(face: *mut FT_FaceRec) -> c_int {
+    if face.is_null() {
+        return 0;
+    }
+    1
+}
+
+#[repr(C)]
+pub struct BDF_PropertyRec {
+    pub prop_type: c_int,
+    pub u: [usize; 2],
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_BDF_Property(
+    _face: *mut FT_FaceRec,
+    _prop_name: *const c_char,
+    _aproperty: *mut BDF_PropertyRec,
+) -> c_int {
+    6 // FT_Err_Invalid_Argument (not a BDF font)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_BDF_Charset_ID(
+    _face: *mut FT_FaceRec,
+    _acharset_encoding: *mut *const c_char,
+    _acharset_registry: *mut *const c_char,
+) -> c_int {
+    6 // FT_Err_Invalid_Argument
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_FSType_Flags(_face: *mut FT_FaceRec) -> c_ushort {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Gasp(_face: *mut FT_FaceRec, _ppem: c_uint) -> c_int {
+    0 // FT_GASP_NO_TABLE
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_WinFNT_Header(
+    _face: *mut FT_FaceRec,
+    _aheader: *mut c_void,
+) -> c_int {
+    6 // FT_Err_Invalid_Argument
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_GetCharVariantIndex(
+    face: *mut FT_FaceRec,
+    charcode: c_ulong,
+    _variantSelector: c_ulong,
+) -> c_uint {
+    FT_Get_Char_Index(face, charcode)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_GetCharVariantIsDefault(
+    _face: *mut FT_FaceRec,
+    _charcode: c_ulong,
+    _variantSelector: c_ulong,
+) -> c_int {
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_GetVariantSelectors(_face: *mut FT_FaceRec) -> *mut c_uint {
+    ptr::null_mut()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_GetVariantsOfChar(
+    _face: *mut FT_FaceRec,
+    _charcode: c_ulong,
+) -> *mut c_uint {
+    ptr::null_mut()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_GetCharsOfVariant(
+    _face: *mut FT_FaceRec,
+    _variantSelector: c_ulong,
+) -> *mut c_uint {
+    ptr::null_mut()
+}
+
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Track_Kerning(
+    _face: *mut FT_FaceRec,
+    _point_size: c_long,
+    _degree: c_int,
+    akerning: *mut c_long,
+) -> c_int {
+    if !akerning.is_null() {
+        *akerning = 0;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Var_Axis_Flags(
+    _master: *mut c_void,
+    _axis_index: c_uint,
+    flags: *mut c_uint,
+) -> c_int {
+    if !flags.is_null() {
+        *flags = 0;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Get_Default_Named_Instance(
+    _face: *mut FT_FaceRec,
+    instance_index: *mut c_uint,
+) -> c_int {
+    if !instance_index.is_null() {
+        *instance_index = 0;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_CheckTrueTypePatents(_face: *mut FT_FaceRec) -> c_uchar {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Face_SetUnpatentedHinting(
+    _face: *mut FT_FaceRec,
+    _value: c_uchar,
+) -> c_uchar {
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn FT_MulDiv(a: c_long, b: c_long, c: c_long) -> c_long {
+    if c == 0 {
+        return 0;
+    }
+    ((a as i128 * b as i128) / c as i128) as c_long
+}
+
+#[no_mangle]
+pub extern "C" fn FT_DivFix(a: c_long, b: c_long) -> c_long {
+    if b == 0 {
+        return 0;
+    }
+    (((a as i128) << 16) / b as i128) as c_long
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Matrix_Multiply(a: *const FT_Matrix, b: *mut FT_Matrix) {
+    if a.is_null() || b.is_null() {
+        return;
+    }
+    let (xx1, xy1, yx1, yy1) = ((*a).xx, (*a).xy, (*a).yx, (*a).yy);
+    let (xx2, xy2, yx2, yy2) = ((*b).xx, (*b).xy, (*b).yx, (*b).yy);
+
+    (*b).xx = (FT_MulFix(xx1, xx2) + FT_MulFix(xy1, yx2)) as c_long;
+    (*b).xy = (FT_MulFix(xx1, xy2) + FT_MulFix(xy1, yy2)) as c_long;
+    (*b).yx = (FT_MulFix(yx1, xx2) + FT_MulFix(yy1, yx2)) as c_long;
+    (*b).yy = (FT_MulFix(yx1, xy2) + FT_MulFix(yy1, yy2)) as c_long;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Matrix_Invert(matrix: *mut FT_Matrix) -> c_int {
+    if matrix.is_null() {
+        return 1;
+    }
+    let (xx, xy, yx, yy) = ((*matrix).xx, (*matrix).xy, (*matrix).yx, (*matrix).yy);
+    let det = FT_MulFix(xx, yy) - FT_MulFix(xy, yx);
+    if det == 0 {
+        return 1;
+    }
+    (*matrix).xx = FT_DivFix(yy, det);
+    (*matrix).xy = -FT_DivFix(xy, det);
+    (*matrix).yx = -FT_DivFix(yx, det);
+    (*matrix).yy = FT_DivFix(xx, det);
+    0
+}
 #[cfg(test)]
 mod tests {
     use super::*;
