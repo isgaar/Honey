@@ -3,7 +3,7 @@
 //! Uses zero-allocation safe parsing via ttf-parser to convert glyph curves
 //! into Quartz-compatible vector paths.
 
-use crate::dilation::compute_dilation_factor;
+use crate::dilation::{compute_dilation_factor_with_profile, DesktopProfile};
 use crate::rasterizer::{GlyphOutline, PathSegment, Point, QuartzRasterizer, RasterBitmap};
 use ttf_parser::{Face, GlyphId, OutlineBuilder};
 
@@ -233,6 +233,24 @@ impl<'a> HoneyFace<'a> {
         subpixel_offset_x: f32,
         subpixel_offset_y: f32,
     ) -> Option<(RasterBitmap, i32, i32, f32)> {
+        self.render_glyph_with_profile(
+            glyph_id,
+            pixel_size,
+            subpixel_offset_x,
+            subpixel_offset_y,
+            DesktopProfile::Standard,
+        )
+    }
+
+    /// Render a glyph with desktop compositor profile compensation (GNOME Mutter / KDE KWin).
+    pub fn render_glyph_with_profile(
+        &self,
+        glyph_id: u32,
+        pixel_size: f32,
+        subpixel_offset_x: f32,
+        subpixel_offset_y: f32,
+        profile: DesktopProfile,
+    ) -> Option<(RasterBitmap, i32, i32, f32)> {
         let id = GlyphId(glyph_id as u16);
         let upem = self.face.units_per_em().max(1) as f32;
         let scale = pixel_size / upem;
@@ -307,9 +325,9 @@ impl<'a> HoneyFace<'a> {
         let rasterizer = QuartzRasterizer::new(width, height);
         let base_bmp = rasterizer.rasterize(&mapped_outline);
 
-        // Apply optical stem dilation
+        // Apply optical stem dilation calibrated to font size and desktop profile
         let pt_size = pixel_size * 72.0 / 96.0;
-        let factor = compute_dilation_factor(pt_size);
+        let factor = compute_dilation_factor_with_profile(pt_size, profile);
         let dilated_buffer = crate::dilation::dilate_mask(&base_bmp.buffer, width, height, factor);
 
         let final_bmp = RasterBitmap {

@@ -6,11 +6,39 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-use honey_core::{compute_dilation_factor, dilate_mask, GlyphOutline, HoneyFace, OutlineBuilder, QuartzRasterizer};
+use honey_core::{
+    compute_dilation_factor_with_profile, dilate_mask, DesktopProfile, GlyphOutline, HoneyFace,
+    OutlineBuilder, QuartzRasterizer,
+};
 use std::ffi::{c_char, c_int, c_long, c_short, c_uchar, c_uint, c_ulong, c_ushort, c_void, CStr, CString};
 use std::fs;
 use std::ptr;
 use std::slice;
+use std::sync::OnceLock;
+
+fn get_active_profile() -> DesktopProfile {
+    static PROFILE: OnceLock<DesktopProfile> = OnceLock::new();
+    *PROFILE.get_or_init(|| {
+        if let Ok(p) = std::env::var("HONEY_PROFILE") {
+            match p.to_lowercase().as_str() {
+                "gnome" => DesktopProfile::Gnome,
+                "kde" => DesktopProfile::Kde,
+                _ => DesktopProfile::Standard,
+            }
+        } else if let Ok(d) = std::env::var("XDG_CURRENT_DESKTOP") {
+            let upper = d.to_uppercase();
+            if upper.contains("GNOME") {
+                DesktopProfile::Gnome
+            } else if upper.contains("KDE") {
+                DesktopProfile::Kde
+            } else {
+                DesktopProfile::Standard
+            }
+        } else {
+            DesktopProfile::Standard
+        }
+    })
+}
 
 extern "C" {
     fn calloc(nmemb: usize, size: usize) -> *mut c_void;
@@ -1023,9 +1051,10 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
 
         let gid = (*slot).glyph_index;
         let px_size = (*ctx).pixel_size;
+        let profile = get_active_profile();
 
         if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
-            if let Some((bmp, left, top, adv)) = hf.render_glyph(gid, px_size, 0.0, 0.0) {
+            if let Some((bmp, left, top, adv)) = hf.render_glyph_with_profile(gid, px_size, 0.0, 0.0, profile) {
                 // Row stride/pitch MUST be divisible by 4 for Cairo/Pango image surfaces
                 let pitch = ((bmp.width + 3) & !3) as usize;
                 let height = bmp.height as usize;
@@ -1888,7 +1917,8 @@ pub unsafe extern "C" fn FT_Glyph_To_Bitmap(
     if width > 0 && height > 0 && !buf_ptr.is_null() {
         let rasterizer = QuartzRasterizer::new(width, height);
         let base_bmp = rasterizer.rasterize(&glyph_outline);
-        let factor = compute_dilation_factor(12.0);
+        let profile = get_active_profile();
+        let factor = compute_dilation_factor_with_profile(12.0, profile);
         let dilated = dilate_mask(&base_bmp.buffer, width, height, factor);
         for y in 0..height {
             let src_off = y * width;

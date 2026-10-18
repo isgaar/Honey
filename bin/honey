@@ -83,6 +83,8 @@ Uso:
   honey launch-codium [RUTA] Abre Codium con el render macOS de Honey
   honey launch-code [RUTA] Abre VS Code con el render macOS de Honey
   honey launch-cursor [RUTA] Abre Cursor con el render macOS de Honey
+  honey profile set [gnome|kde]  Activa perfil especializado de escritorio (GNOME/KDE)
+  honey profile status           Muestra el perfil activo y parametros de escritorio
   honey status         Muestra estado y muestras de fontconfig
   honey doctor         Revisa dependencias y rutas
   honey paths          Muestra rutas usadas
@@ -384,6 +386,14 @@ apply_gtk_config() {
             remove_ini_value_if_equals "$file" "Settings" "gtk-font-name" "Inter Medium 10.5"
         fi
     done
+
+    if command_exists gsettings; then
+        if [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]] || [[ "${XDG_CURRENT_DESKTOP:-}" == *"gnome"* ]]; then
+            gsettings set org.gnome.desktop.interface font-hinting 'none' 2>/dev/null || true
+            gsettings set org.gnome.desktop.interface font-antialiasing 'grayscale' 2>/dev/null || true
+            gsettings set org.gnome.desktop.interface font-rgba-order 'none' 2>/dev/null || true
+        fi
+    fi
 }
 
 browser_root_dirs() {
@@ -806,6 +816,15 @@ reset_compatibility() {
     cleanup_legacy_codium_launchers
     reset_running_session_environment
     refresh_desktop_launchers
+
+    if command_exists gsettings; then
+        if [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]] || [[ "${XDG_CURRENT_DESKTOP:-}" == *"gnome"* ]]; then
+            gsettings reset org.gnome.desktop.interface font-hinting 2>/dev/null || true
+            gsettings reset org.gnome.desktop.interface font-antialiasing 2>/dev/null || true
+            gsettings reset org.gnome.desktop.interface font-rgba-order 2>/dev/null || true
+        fi
+    fi
+    rm -f "$STATE_DIR/profile"
 }
 
 apply_profile() {
@@ -1227,6 +1246,49 @@ restore_system() {
     ok "Sistema restaurado al motor FreeType original de fabrica."
 }
 
+set_desktop_profile() {
+    local target_profile="${1:-}"
+    case "$target_profile" in
+        gnome|GNOME)
+            mkdir -p "$STATE_DIR"
+            echo "gnome" > "$STATE_DIR/profile"
+            if command_exists gsettings; then
+                gsettings set org.gnome.desktop.interface font-hinting 'none' 2>/dev/null || true
+                gsettings set org.gnome.desktop.interface font-antialiasing 'grayscale' 2>/dev/null || true
+                gsettings set org.gnome.desktop.interface font-rgba-order 'none' 2>/dev/null || true
+            fi
+            export HONEY_PROFILE="gnome"
+            ok "Perfil GNOME activado: dilatacion Mutter 1.15x, hintstyle=none, escala de grises de 8 bits"
+            ;;
+        kde|KDE)
+            mkdir -p "$STATE_DIR"
+            echo "kde" > "$STATE_DIR/profile"
+            export HONEY_PROFILE="kde"
+            ok "Perfil KDE activado: fidelidad vectorial para Distance Fields SDF y escala geometrica 1:1"
+            ;;
+        *)
+            die "Uso: honey profile set [gnome|kde]"
+            ;;
+    esac
+}
+
+status_desktop_profile() {
+    local prof="standard"
+    if [[ -f "$STATE_DIR/profile" ]]; then
+        prof="$(cat "$STATE_DIR/profile" 2>/dev/null || echo "standard")"
+    elif [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]]; then
+        prof="gnome (auto-detectado por XDG_CURRENT_DESKTOP)"
+    elif [[ "${XDG_CURRENT_DESKTOP:-}" == *"KDE"* ]]; then
+        prof="kde (auto-detectado por XDG_CURRENT_DESKTOP)"
+    fi
+    printf 'Perfil de escritorio activo: %s\n' "$prof"
+    if command_exists gsettings && [[ "${XDG_CURRENT_DESKTOP:-}" == *"GNOME"* ]]; then
+        printf '  GNOME font-hinting     : %s\n' "$(gsettings get org.gnome.desktop.interface font-hinting 2>/dev/null || echo 'desconocido')"
+        printf '  GNOME font-antialiasing: %s\n' "$(gsettings get org.gnome.desktop.interface font-antialiasing 2>/dev/null || echo 'desconocido')"
+        printf '  GNOME font-rgba-order  : %s\n' "$(gsettings get org.gnome.desktop.interface font-rgba-order 2>/dev/null || echo 'desconocido')"
+    fi
+}
+
 main() {
     local command_name="${1:-help}"
     shift || true
@@ -1234,6 +1296,13 @@ main() {
     case "$command_name" in
         apply) apply_profile ;;
         reset) reset_profile ;;
+        profile)
+            case "${1:-}" in
+                set) shift; set_desktop_profile "${1:-}" ;;
+                status) status_desktop_profile ;;
+                *) die "Uso: honey profile [set gnome|set kde|status]" ;;
+            esac
+            ;;
         install-system) install_system "$@" ;;
         status-system) status_system "$@" ;;
         restore-system) restore_system "$@" ;;

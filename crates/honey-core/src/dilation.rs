@@ -2,6 +2,18 @@
 //!
 //! Replicates `CGContextSetFontDilation(context, CGSize(w, h))` and FreeType darkening curves.
 
+/// Desktop rendering profile for compositor compensation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DesktopProfile {
+    #[default]
+    Standard,
+    /// GNOME Mutter profile: applies 1.15x dilation boost at reading sizes (9-16pt)
+    /// to compensate for bilinear downscaling during fractional scaling (supersampling 2x).
+    Gnome,
+    /// KDE Plasma profile: 1:1 unwarped vector curves for QtQuick SDF distance fields.
+    Kde,
+}
+
 /// Compute optical dilation factor based on typographic font size (pt).
 ///
 /// Follows the Apple optical scaling curve: maximum dilation at small reading sizes
@@ -19,6 +31,21 @@ pub fn compute_dilation_factor(pt_size: f32) -> f32 {
         0.04 - (pt_size - 32.0) * (0.04 / 16.0)
     } else {
         0.0
+    }
+}
+
+/// Compute optical dilation factor taking into account the active desktop profile.
+pub fn compute_dilation_factor_with_profile(pt_size: f32, profile: DesktopProfile) -> f32 {
+    let base = compute_dilation_factor(pt_size);
+    match profile {
+        DesktopProfile::Gnome => {
+            if pt_size >= 9.0 && pt_size <= 16.0 {
+                (base * 1.15).min(0.25)
+            } else {
+                base
+            }
+        }
+        _ => base,
     }
 }
 
@@ -138,5 +165,18 @@ mod tests {
             pct >= 4.0 && pct <= 18.0,
             "Expected +4% to +18% ink energy boost, got +{pct:.2}%"
         );
+    }
+
+    #[test]
+    fn test_gnome_profile_dilation_boost() {
+        let pt_12 = 12.0;
+        let factor_std = compute_dilation_factor_with_profile(pt_12, DesktopProfile::Standard);
+        let factor_gnome = compute_dilation_factor_with_profile(pt_12, DesktopProfile::Gnome);
+        assert!(
+            factor_gnome > factor_std,
+            "GNOME profile must apply compensation boost at 12pt reading size"
+        );
+        let diff = factor_gnome / factor_std;
+        assert!((diff - 1.15).abs() < 1e-4, "Expected 1.15x boost, got {diff}");
     }
 }
