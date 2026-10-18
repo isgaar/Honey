@@ -96,6 +96,12 @@ install_files() {
     copy_tree "shaders"
     copy_tree "packages"
 
+    if [[ -f "$SOURCE_DIR/target/release/libhoney_shim.so" ]]; then
+        mkdir -p "$INSTALL_DIR/target/release"
+        cp -f "$SOURCE_DIR/target/release/libhoney_shim.so" "$INSTALL_DIR/target/release/libhoney_shim.so"
+        cp -f "$SOURCE_DIR/target/release/libhoney_shim.so" "$INSTALL_DIR/libhoney_shim.so"
+    fi
+
     chmod +x "$INSTALL_DIR/bin/honey"
     chmod +x "$INSTALL_DIR/installer.sh"
     [[ -f "$INSTALL_DIR/examples/check-rendering.sh" ]] && chmod +x "$INSTALL_DIR/examples/check-rendering.sh"
@@ -115,10 +121,30 @@ run_honey() {
     fi
 }
 
+ensure_rust_binary_built() {
+    local source_shim="$SOURCE_DIR/target/release/libhoney_shim.so"
+    if [[ ! -f "$source_shim" ]]; then
+        info "Compilando Honey Rust Core en perfil release como usuario..."
+        local cargo_cmd="cargo"
+        if ! command -v cargo >/dev/null 2>&1 && [[ -x "$HOME/.cargo/bin/cargo" ]]; then
+            cargo_cmd="$HOME/.cargo/bin/cargo"
+        fi
+        (cd "$SOURCE_DIR" && "$cargo_cmd" build --release -p honey-shim)
+    fi
+    [[ -f "$source_shim" ]] || fail "No se pudo compilar $source_shim"
+    ok "Binario compilado verificado: $source_shim"
+}
+
 install_native_mode() {
     info "Preparando instalacion en Modo Nativo de Bajo Nivel (Rust / Quartz Parity)..."
+
+    # 1. Asegurar compilacion en espacio de usuario con cargo antes de pedir sudo
+    ensure_rust_binary_built
+
+    # 2. Instalar y copiar archivos (incluye target/release/libhoney_shim.so)
     install_files
 
+    # 3. Invocar sudo unicamente para registrar el reemplazo de biblioteca
     if [[ $EUID -eq 0 ]]; then
         run_honey install-system
     else

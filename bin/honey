@@ -1056,9 +1056,39 @@ install_system() {
     [[ $EUID -eq 0 ]] || die "El comando 'install-system' requiere privilegios de superusuario (ejecute con sudo)."
 
     local shim_src="$ROOT_DIR/target/release/libhoney_shim.so"
+
+    if [[ ! -f "$shim_src" && -f "$ROOT_DIR/libhoney_shim.so" ]]; then
+        shim_src="$ROOT_DIR/libhoney_shim.so"
+    fi
+
+    if [[ ! -f "$shim_src" && -n "${SUDO_USER:-}" ]]; then
+        local user_home
+        user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+        if [[ -f "$user_home/Proyectos/Honey/target/release/libhoney_shim.so" ]]; then
+            shim_src="$user_home/Proyectos/Honey/target/release/libhoney_shim.so"
+        elif [[ -f "$user_home/.local/share/honey/target/release/libhoney_shim.so" ]]; then
+            shim_src="$user_home/.local/share/honey/target/release/libhoney_shim.so"
+        fi
+    fi
+
     if [[ ! -f "$shim_src" ]]; then
         printf 'Compilando Honey Rust Core en perfil release...\n'
-        (cd "$ROOT_DIR" && cargo build --release -p honey-shim)
+        local cargo_cmd="cargo"
+        if ! command -v cargo >/dev/null 2>&1; then
+            if [[ -n "${SUDO_USER:-}" ]]; then
+                local user_home
+                user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+                if [[ -x "$user_home/.cargo/bin/cargo" ]]; then
+                    cargo_cmd="$user_home/.cargo/bin/cargo"
+                    export PATH="$user_home/.cargo/bin:$PATH"
+                fi
+            fi
+            if [[ -x "$HOME/.cargo/bin/cargo" ]]; then
+                cargo_cmd="$HOME/.cargo/bin/cargo"
+                export PATH="$HOME/.cargo/bin:$PATH"
+            fi
+        fi
+        (cd "$ROOT_DIR" && "$cargo_cmd" build --release -p honey-shim)
     fi
     [[ -f "$shim_src" ]] || die "No se encontro el binario compilado en $shim_src"
 
