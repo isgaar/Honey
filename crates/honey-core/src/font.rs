@@ -203,20 +203,17 @@ impl<'a> HoneyFace<'a> {
             };
         }
 
-        let pad = 1;
-        let raw_left = collector.min_x.floor() as i32;
-        let raw_top = collector.max_y.ceil() as i32;
-        let raw_right = collector.max_x.ceil() as i32;
-        let raw_bottom = collector.min_y.floor() as i32;
+        let left = collector.min_x.floor() as i32;
+        let top = collector.max_y.ceil() as i32;
+        let right = collector.max_x.ceil() as i32;
+        let bottom = collector.min_y.floor() as i32;
 
-        let bitmap_left = raw_left - pad;
-        let bitmap_top = raw_top + pad;
-        let width = ((raw_right - raw_left).max(0) as usize) + (pad as usize * 2);
-        let height = ((raw_top - raw_bottom).max(0) as usize) + (pad as usize * 2);
+        let width = (right - left).max(0) as usize;
+        let height = (top - bottom).max(0) as usize;
 
         GlyphMetrics {
-            left: bitmap_left,
-            top: bitmap_top,
+            left,
+            top,
             width,
             height,
             advance,
@@ -255,16 +252,13 @@ impl<'a> HoneyFace<'a> {
             return Some((bmp, 0, 0, advance));
         }
 
-        let pad = 1;
-        let raw_left = collector.min_x.floor() as i32;
-        let raw_top = collector.max_y.ceil() as i32;
-        let raw_right = collector.max_x.ceil() as i32;
-        let raw_bottom = collector.min_y.floor() as i32;
+        let left = collector.min_x.floor() as i32;
+        let top = collector.max_y.ceil() as i32;
+        let right = collector.max_x.ceil() as i32;
+        let bottom = collector.min_y.floor() as i32;
 
-        let bitmap_left = raw_left - pad;
-        let bitmap_top = raw_top + pad;
-        let width = ((raw_right - raw_left).max(0) as usize) + (pad as usize * 2);
-        let height = ((raw_top - raw_bottom).max(0) as usize) + (pad as usize * 2);
+        let width = (right - left).max(0) as usize;
+        let height = (top - bottom).max(0) as usize;
 
         if width == 0 || height == 0 {
             let bmp = RasterBitmap {
@@ -277,8 +271,8 @@ impl<'a> HoneyFace<'a> {
             return Some((bmp, 0, 0, advance));
         }
 
-        let left_f = bitmap_left as f32;
-        let top_f = bitmap_top as f32;
+        let left_f = left as f32;
+        let top_f = top as f32;
 
         let mut mapped_outline = GlyphOutline::new();
         mapped_outline.segments.reserve(collector.segments.len());
@@ -321,12 +315,12 @@ impl<'a> HoneyFace<'a> {
         let final_bmp = RasterBitmap {
             width,
             height,
-            left: bitmap_left,
-            top: bitmap_top,
+            left,
+            top,
             buffer: dilated_buffer,
         };
 
-        Some((final_bmp, bitmap_left, bitmap_top, advance))
+        Some((final_bmp, left, top, advance))
     }
 }
 

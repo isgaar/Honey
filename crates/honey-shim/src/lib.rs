@@ -476,13 +476,38 @@ pub extern "C" fn FT_New_Face(
     init_face_from_bytes(font_bytes, face_index, aface)
 }
 
+pub type FT_Stream_IoFunc = unsafe extern "C" fn(
+    stream: *mut FT_StreamRec,
+    offset: c_ulong,
+    buffer: *mut c_uchar,
+    count: c_ulong,
+) -> c_ulong;
+
+pub type FT_Stream_CloseFunc = unsafe extern "C" fn(
+    stream: *mut FT_StreamRec,
+);
+
+#[repr(C)]
+pub struct FT_StreamRec {
+    pub base: *mut c_uchar,
+    pub size: c_ulong,
+    pub pos: c_ulong,
+    pub descriptor: *mut c_void,
+    pub pathname: *mut c_void,
+    pub read: Option<FT_Stream_IoFunc>,
+    pub close: Option<FT_Stream_CloseFunc>,
+    pub memory: *mut c_void,
+    pub cursor: *mut c_uchar,
+    pub limit: *mut c_uchar,
+}
+
 #[repr(C)]
 pub struct FT_Open_Args {
     pub flags: c_uint,
     pub memory_base: *const c_uchar,
     pub memory_size: c_long,
     pub pathname: *mut c_char,
-    pub stream: *mut c_void,
+    pub stream: *mut FT_StreamRec,
     pub driver: *mut c_void,
     pub num_params: c_int,
     pub params: *mut c_void,
@@ -493,6 +518,29 @@ pub const FT_OPEN_STREAM: c_uint = 0x2;
 pub const FT_OPEN_PATHNAME: c_uint = 0x4;
 pub const FT_OPEN_DRIVER: c_uint = 0x8;
 pub const FT_OPEN_PARAMS: c_uint = 0x10;
+
+unsafe fn read_stream_bytes(stream: *mut FT_StreamRec) -> Option<Vec<u8>> {
+    if stream.is_null() {
+        return None;
+    }
+    let size = (*stream).size as usize;
+    if size == 0 || size > 500 * 1024 * 1024 {
+        return None;
+    }
+    if !(*stream).base.is_null() {
+        return Some(std::slice::from_raw_parts((*stream).base, size).to_vec());
+    }
+    if let Some(read_fn) = (*stream).read {
+        let mut buf = vec![0u8; size];
+        let read_bytes = read_fn(stream, 0, buf.as_mut_ptr(), (*stream).size);
+        if read_bytes == 0 && size > 0 {
+            return None;
+        }
+        buf.truncate(read_bytes as usize);
+        return Some(buf);
+    }
+    None
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn FT_Open_Face(
@@ -510,7 +558,22 @@ pub unsafe extern "C" fn FT_Open_Face(
     if ((*args).flags & FT_OPEN_PATHNAME) != 0 && !(*args).pathname.is_null() {
         return FT_New_Face(library, (*args).pathname, face_index, aface);
     }
+    if ((*args).flags & FT_OPEN_STREAM) != 0 && !(*args).stream.is_null() {
+        if let Some(bytes) = read_stream_bytes((*args).stream) {
+            return init_face_from_bytes(bytes, face_index, aface);
+        }
+    }
     1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Attach_File(_face: *mut FT_FaceRec, _filepathname: *const c_char) -> c_int {
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Attach_Stream(_face: *mut FT_FaceRec, _parameters: *mut FT_Open_Args) -> c_int {
+    0
 }
 
 fn init_face_from_bytes(
@@ -1746,11 +1809,10 @@ pub unsafe extern "C" fn FT_Glyph_To_Bitmap(
         return 0;
     }
 
-    let pad = 1;
-    let left = ((cbox.xMin >> 6) as i32) - pad;
-    let top = (((cbox.yMax + 63) >> 6) as i32) + pad;
-    let right = (((cbox.xMax + 63) >> 6) as i32) + pad;
-    let bottom = ((cbox.yMin >> 6) as i32) - pad;
+    let left = (cbox.xMin >> 6) as i32;
+    let top = ((cbox.yMax + 63) >> 6) as i32;
+    let right = ((cbox.xMax + 63) >> 6) as i32;
+    let bottom = (cbox.yMin >> 6) as i32;
     let width = (right - left).max(0) as usize;
     let height = (top - bottom).max(0) as usize;
     let pitch = ((width + 3) & !3) as usize;
@@ -2834,6 +2896,63 @@ mod tests {
             assert_eq!(row0[7], 0);
 
             assert_eq!(FT_Bitmap_Done(ptr::null_mut(), &mut dst), 0);
+        }
+    }
+
+    #[test]
+    fn test_ft_open_stream() {
+        let mut lib: *mut c_void = ptr::null_mut();
+        assert_eq!(FT_Init_FreeType(&mut lib), 0);
+
+        let font_path = if std::path::Path::new("/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf").exists() {
+            "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf"
+        } else if std::path::Path::new("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf").exists() {
+            "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"
+        } else if std::path::Path::new("/System/Library/Fonts/Helvetica.ttc").exists() {
+            "/System/Library/Fonts/Helvetica.ttc"
+        } else {
+            "/System/Library/Fonts/Menlo.ttc"
+        };
+
+        let font_bytes = std::fs::read(font_path).expect("Failed to read font file");
+        let mut mem_stream = FT_StreamRec {
+            base: font_bytes.as_ptr() as *mut c_uchar,
+            size: font_bytes.len() as c_ulong,
+            pos: 0,
+            descriptor: ptr::null_mut(),
+            pathname: ptr::null_mut(),
+            read: None,
+            close: None,
+            memory: ptr::null_mut(),
+            cursor: ptr::null_mut(),
+            limit: ptr::null_mut(),
+        };
+
+        let open_args = FT_Open_Args {
+            flags: FT_OPEN_STREAM,
+            memory_base: ptr::null(),
+            memory_size: 0,
+            pathname: ptr::null_mut(),
+            stream: &mut mem_stream,
+            driver: ptr::null_mut(),
+            num_params: 0,
+            params: ptr::null_mut(),
+        };
+
+        let mut face: *mut FT_FaceRec = ptr::null_mut();
+        unsafe {
+            let res = FT_Open_Face(lib, &open_args, 0, &mut face);
+            assert_eq!(res, 0);
+            assert!(!face.is_null());
+            assert!((*face).num_glyphs > 0);
+
+            // Test FT_Attach stubs
+            assert_eq!(FT_Attach_File(face, ptr::null()), 0);
+            let mut attach_args = open_args;
+            assert_eq!(FT_Attach_Stream(face, &mut attach_args), 0);
+
+            assert_eq!(FT_Done_Face(face), 0);
+            assert_eq!(FT_Done_FreeType(lib), 0);
         }
     }
 }

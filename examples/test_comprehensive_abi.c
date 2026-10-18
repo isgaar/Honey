@@ -56,6 +56,27 @@ int main(int argc, char* argv[]) {
     const char* font_path = "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf";
     if (argc > 1) {
         font_path = argv[1];
+    } else {
+        FILE* tf = fopen(font_path, "rb");
+        if (tf) {
+            fclose(tf);
+        } else {
+            const char* fallbacks[] = {
+                "/System/Library/Fonts/Helvetica.ttc",
+                "/Library/Fonts/Arial.ttf",
+                "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                NULL
+            };
+            for (int i = 0; fallbacks[i]; i++) {
+                FILE* f = fopen(fallbacks[i], "rb");
+                if (f) {
+                    fclose(f);
+                    font_path = fallbacks[i];
+                    break;
+                }
+            }
+        }
     }
 
     FT_Library library = NULL;
