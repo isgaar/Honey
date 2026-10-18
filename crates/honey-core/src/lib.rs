@@ -15,6 +15,7 @@ pub use dilation::{
 pub use font::{count_faces, GlyphMetrics, HoneyFace};
 pub use gamma::{blend_glyph_buffer, blend_linear, linear_to_srgb, srgb_to_linear};
 pub use rasterizer::{GlyphOutline, Point, QuartzRasterizer, RasterBitmap};
+pub use ttf_parser;
 pub use ttf_parser::OutlineBuilder;
 
 /// Render a vector glyph outline with complete Quartz compositor parity:

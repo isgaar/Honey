@@ -67,9 +67,32 @@ pub const FT_KERNING_UNFITTED: c_uint = 1;
 pub const FT_KERNING_UNSCALED: c_uint = 2;
 
 pub const FT_FACE_FLAG_SCALABLE: c_long = 1 << 0;
-pub const FT_FACE_FLAG_HORIZONTAL: c_long = 1 << 3;
+pub const FT_FACE_FLAG_FIXED_SIZES: c_long = 1 << 1;
+pub const FT_FACE_FLAG_FIXED_WIDTH: c_long = 1 << 2;
+pub const FT_FACE_FLAG_SFNT: c_long = 1 << 3;
+pub const FT_FACE_FLAG_HORIZONTAL: c_long = 1 << 4;
+pub const FT_FACE_FLAG_VERTICAL: c_long = 1 << 5;
 pub const FT_FACE_FLAG_KERNING: c_long = 1 << 6;
+pub const FT_FACE_FLAG_FAST_GLYPHS: c_long = 1 << 7;
+pub const FT_FACE_FLAG_MULTIPLE_MASTERS: c_long = 1 << 8;
 pub const FT_FACE_FLAG_GLYPH_NAMES: c_long = 1 << 9;
+pub const FT_FACE_FLAG_EXTERNAL_STREAM: c_long = 1 << 10;
+pub const FT_FACE_FLAG_HINTER: c_long = 1 << 11;
+pub const FT_FACE_FLAG_CID_KEYED: c_long = 1 << 12;
+pub const FT_FACE_FLAG_TRICKY: c_long = 1 << 13;
+pub const FT_FACE_FLAG_COLOR: c_long = 1 << 14;
+pub const FT_FACE_FLAG_VARIATION: c_long = 1 << 15;
+
+pub const FT_STYLE_FLAG_ITALIC: c_long = 1 << 0;
+pub const FT_STYLE_FLAG_BOLD: c_long = 1 << 1;
+
+pub const FT_SFNT_HEAD: c_uint = 0;
+pub const FT_SFNT_MAXP: c_uint = 1;
+pub const FT_SFNT_OS2: c_uint = 2;
+pub const FT_SFNT_HHEA: c_uint = 3;
+pub const FT_SFNT_VHEA: c_uint = 4;
+pub const FT_SFNT_POST: c_uint = 5;
+pub const FT_SFNT_PCLT: c_uint = 6;
 
 #[repr(C)]
 pub struct FT_Bitmap {
@@ -270,6 +293,135 @@ pub struct FT_OutlineGlyphRec {
     pub outline: FT_Outline,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SfntNameRecord {
+    pub platform_id: c_ushort,
+    pub encoding_id: c_ushort,
+    pub language_id: c_ushort,
+    pub name_id: c_ushort,
+    pub offset: usize,
+    pub len: usize,
+}
+
+#[repr(C)]
+pub struct TT_OS2 {
+    pub version: c_ushort,
+    pub xAvgCharWidth: c_short,
+    pub usWeightClass: c_ushort,
+    pub usWidthClass: c_ushort,
+    pub fsType: c_ushort,
+    pub ySubscriptXSize: c_short,
+    pub ySubscriptYSize: c_short,
+    pub ySubscriptXOffset: c_short,
+    pub ySubscriptYOffset: c_short,
+    pub ySuperscriptXSize: c_short,
+    pub ySuperscriptYSize: c_short,
+    pub ySuperscriptXOffset: c_short,
+    pub ySuperscriptYOffset: c_short,
+    pub yStrikeoutSize: c_short,
+    pub yStrikeoutPosition: c_short,
+    pub sFamilyClass: c_short,
+    pub panose: [c_uchar; 10],
+    pub ulUnicodeRange1: c_ulong,
+    pub ulUnicodeRange2: c_ulong,
+    pub ulUnicodeRange3: c_ulong,
+    pub ulUnicodeRange4: c_ulong,
+    pub achVendID: [c_char; 4],
+    pub fsSelection: c_ushort,
+    pub usFirstCharIndex: c_ushort,
+    pub usLastCharIndex: c_ushort,
+    pub sTypoAscender: c_short,
+    pub sTypoDescender: c_short,
+    pub sTypoLineGap: c_short,
+    pub usWinAscent: c_ushort,
+    pub usWinDescent: c_ushort,
+    pub ulCodePageRange1: c_ulong,
+    pub ulCodePageRange2: c_ulong,
+    pub sxHeight: c_short,
+    pub sCapHeight: c_short,
+    pub usDefaultChar: c_ushort,
+    pub usBreakChar: c_ushort,
+    pub usMaxContext: c_ushort,
+    pub usLowerOpticalPointSize: c_ushort,
+    pub usUpperOpticalPointSize: c_ushort,
+}
+
+fn parse_os2_table(data: &[u8]) -> Option<TT_OS2> {
+    if data.len() < 78 {
+        return None;
+    }
+    let read_u16 = |off: usize| -> u16 {
+        if off + 2 <= data.len() {
+            u16::from_be_bytes([data[off], data[off + 1]])
+        } else {
+            0
+        }
+    };
+    let read_i16 = |off: usize| -> i16 { read_u16(off) as i16 };
+    let read_u32 = |off: usize| -> u32 {
+        if off + 4 <= data.len() {
+            u32::from_be_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+        } else {
+            0
+        }
+    };
+
+    let version = read_u16(0);
+    let mut panose = [0u8; 10];
+    if data.len() >= 42 {
+        panose.copy_from_slice(&data[32..42]);
+    }
+    let mut vend = [0 as c_char; 4];
+    if data.len() >= 62 {
+        for i in 0..4 {
+            vend[i] = data[58 + i] as c_char;
+        }
+    }
+
+    Some(TT_OS2 {
+        version,
+        xAvgCharWidth: read_i16(2),
+        usWeightClass: read_u16(4),
+        usWidthClass: read_u16(6),
+        fsType: read_u16(8),
+        ySubscriptXSize: read_i16(10),
+        ySubscriptYSize: read_i16(12),
+        ySubscriptXOffset: read_i16(14),
+        ySubscriptYOffset: read_i16(16),
+        ySuperscriptXSize: read_i16(18),
+        ySuperscriptYSize: read_i16(20),
+        ySuperscriptXOffset: read_i16(22),
+        ySuperscriptYOffset: read_i16(24),
+        yStrikeoutSize: read_i16(26),
+        yStrikeoutPosition: read_i16(28),
+        sFamilyClass: read_i16(30),
+        panose,
+        ulUnicodeRange1: read_u32(42) as c_ulong,
+        ulUnicodeRange2: read_u32(46) as c_ulong,
+        ulUnicodeRange3: read_u32(50) as c_ulong,
+        ulUnicodeRange4: read_u32(54) as c_ulong,
+        achVendID: vend,
+        fsSelection: read_u16(62),
+        usFirstCharIndex: read_u16(64),
+        usLastCharIndex: read_u16(66),
+        sTypoAscender: read_i16(68),
+        sTypoDescender: read_i16(70),
+        sTypoLineGap: read_i16(72),
+        usWinAscent: read_u16(74),
+        usWinDescent: read_u16(76),
+        ulCodePageRange1: if version >= 1 { read_u32(78) as c_ulong } else { 0 },
+        ulCodePageRange2: if version >= 1 { read_u32(82) as c_ulong } else { 0 },
+        sxHeight: if version >= 2 { read_i16(86) } else { 0 },
+        sCapHeight: if version >= 2 { read_i16(88) } else { 0 },
+        usDefaultChar: if version >= 2 { read_u16(90) } else { 0 },
+        usBreakChar: if version >= 2 { read_u16(92) } else { 0 },
+        usMaxContext: if version >= 2 { read_u16(94) } else { 0 },
+        usLowerOpticalPointSize: if version >= 5 { read_u16(96) } else { 0 },
+        usUpperOpticalPointSize: if version >= 5 { read_u16(98) } else { 0 },
+    })
+}
+
 /// Internal state holding font bytes, metrics, and rasterization properties.
 pub struct FaceContext {
     pub font_data: Vec<u8>,
@@ -284,6 +436,8 @@ pub struct FaceContext {
     pub size_obj: FT_SizeRec,
     pub transform_matrix: Option<FT_Matrix>,
     pub transform_delta: Option<FT_Vector>,
+    pub sfnt_names: Vec<SfntNameRecord>,
+    pub os2_table: Option<Box<TT_OS2>>,
 }
 
 struct OutlineAccumulator {
@@ -654,16 +808,54 @@ fn init_face_from_bytes(
     }
 
     let actual_index = (face_index.max(0) & 0xFFFF) as u32;
-    let (num_glyphs, units_per_em, ascender, descender, family_name, style_name) =
+    let (num_glyphs, units_per_em, ascender, descender, family_name, style_name, is_italic, is_bold, is_mono, is_var, sfnt_names, os2_table) =
         match HoneyFace::from_slice(&font_bytes, actual_index) {
-            Ok(f) => (
-                f.number_of_glyphs() as c_long,
-                f.units_per_em(),
-                f.ascender(),
-                f.descender(),
-                f.family_name().unwrap_or_else(|| "Honey Font".to_string()),
-                "Regular".to_string(),
-            ),
+            Ok(f) => {
+                let base_ptr = font_bytes.as_ptr() as usize;
+                let mut names = Vec::new();
+                for name in f.raw_face().names() {
+                    let n_ptr = name.name.as_ptr() as usize;
+                    if n_ptr >= base_ptr && n_ptr + name.name.len() <= base_ptr + font_bytes.len() {
+                        names.push(SfntNameRecord {
+                            platform_id: name.platform_id as c_ushort,
+                            encoding_id: name.encoding_id,
+                            language_id: name.language_id,
+                            name_id: name.name_id,
+                            offset: n_ptr - base_ptr,
+                            len: name.name.len(),
+                        });
+                    }
+                }
+                let fam = f.family_name().unwrap_or_else(|| "Honey Font".to_string());
+                let is_it = f.is_italic();
+                let is_bld = f.is_bold();
+                let sty = f.style_name().unwrap_or_else(|| {
+                    if is_it && is_bld {
+                        "Bold Italic".to_string()
+                    } else if is_it {
+                        "Italic".to_string()
+                    } else if is_bld {
+                        "Bold".to_string()
+                    } else {
+                        "Regular".to_string()
+                    }
+                });
+                let os2 = f.table_data(*b"OS/2").and_then(parse_os2_table).map(Box::new);
+                (
+                    f.number_of_glyphs() as c_long,
+                    f.units_per_em(),
+                    f.ascender(),
+                    f.descender(),
+                    fam,
+                    sty,
+                    is_it,
+                    is_bld,
+                    f.is_monospaced(),
+                    f.is_variable(),
+                    names,
+                    os2,
+                )
+            }
             Err(_) => return 3, // Unknown file format
         };
 
@@ -702,6 +894,8 @@ fn init_face_from_bytes(
         },
         transform_matrix: None,
         transform_delta: None,
+        sfnt_names,
+        os2_table,
     });
 
     let slot = Box::new(FT_GlyphSlotRec {
@@ -745,6 +939,25 @@ fn init_face_from_bytes(
         internal: ptr::null_mut(),
     });
 
+    let mut computed_face_flags: c_long = FT_FACE_FLAG_SCALABLE | FT_FACE_FLAG_HORIZONTAL | FT_FACE_FLAG_SFNT | FT_FACE_FLAG_KERNING;
+    if num_glyphs > 0 {
+        computed_face_flags |= FT_FACE_FLAG_GLYPH_NAMES;
+    }
+    if is_mono {
+        computed_face_flags |= FT_FACE_FLAG_FIXED_WIDTH;
+    }
+    if is_var {
+        computed_face_flags |= FT_FACE_FLAG_MULTIPLE_MASTERS | FT_FACE_FLAG_VARIATION;
+    }
+
+    let mut computed_style_flags: c_long = 0;
+    if is_italic || style_name.to_lowercase().contains("italic") || style_name.to_lowercase().contains("oblique") {
+        computed_style_flags |= FT_STYLE_FLAG_ITALIC;
+    }
+    if is_bold || style_name.to_lowercase().contains("bold") {
+        computed_style_flags |= FT_STYLE_FLAG_BOLD;
+    }
+
     let family = CString::new(family_name).unwrap_or_else(|_| CString::new("Font").unwrap()).into_raw();
     let style = CString::new(style_name).unwrap_or_else(|_| CString::new("Regular").unwrap()).into_raw();
     let slot_raw = Box::into_raw(slot);
@@ -754,8 +967,8 @@ fn init_face_from_bytes(
     let face = Box::new(FT_FaceRec {
         num_faces: total_faces,
         face_index,
-        face_flags: FT_FACE_FLAG_SCALABLE | FT_FACE_FLAG_HORIZONTAL | FT_FACE_FLAG_KERNING | FT_FACE_FLAG_GLYPH_NAMES,
-        style_flags: 0,
+        face_flags: computed_face_flags,
+        style_flags: computed_style_flags,
         num_glyphs,
         family_name: family,
         style_name: style,
@@ -1176,8 +1389,19 @@ pub unsafe extern "C" fn FT_Load_Sfnt_Table(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn FT_Get_Sfnt_Table(face: *mut FT_FaceRec, _tag: c_uint) -> *mut c_void {
-    let _ = face;
+pub unsafe extern "C" fn FT_Get_Sfnt_Table(face: *mut FT_FaceRec, tag: c_uint) -> *mut c_void {
+    if face.is_null() {
+        return ptr::null_mut();
+    }
+    let ctx = match unsafe { (*face).internal.as_mut() } {
+        Some(c) => c,
+        None => return ptr::null_mut(),
+    };
+    if tag == FT_SFNT_OS2 {
+        if let Some(ref mut os2) = ctx.os2_table {
+            return os2.as_mut() as *mut TT_OS2 as *mut c_void;
+        }
+    }
     ptr::null_mut()
 }
 
@@ -1415,17 +1639,52 @@ pub unsafe extern "C" fn FT_Get_Name_Index(
     0
 }
 
+#[repr(C)]
+pub struct FT_SfntName {
+    pub platform_id: c_ushort,
+    pub encoding_id: c_ushort,
+    pub language_id: c_ushort,
+    pub name_id: c_ushort,
+    pub string: *mut c_uchar,
+    pub string_len: c_uint,
+}
+
 #[no_mangle]
-pub unsafe extern "C" fn FT_Get_Sfnt_Name_Count(_face: *mut FT_FaceRec) -> c_uint {
-    1
+pub unsafe extern "C" fn FT_Get_Sfnt_Name_Count(face: *mut FT_FaceRec) -> c_uint {
+    if face.is_null() {
+        return 0;
+    }
+    let ctx = match unsafe { (*face).internal.as_ref() } {
+        Some(c) => c,
+        None => return 0,
+    };
+    ctx.sfnt_names.len() as c_uint
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn FT_Get_Sfnt_Name(
-    _face: *mut FT_FaceRec,
-    _idx: c_uint,
-    _aname: *mut c_void,
+    face: *mut FT_FaceRec,
+    idx: c_uint,
+    aname: *mut FT_SfntName,
 ) -> c_int {
+    if face.is_null() || aname.is_null() {
+        return 1;
+    }
+    let ctx = match unsafe { (*face).internal.as_ref() } {
+        Some(c) => c,
+        None => return 1,
+    };
+    let idx_usize = idx as usize;
+    if idx_usize >= ctx.sfnt_names.len() {
+        return 6; // FT_Err_Invalid_Argument
+    }
+    let rec = &ctx.sfnt_names[idx_usize];
+    (*aname).platform_id = rec.platform_id;
+    (*aname).encoding_id = rec.encoding_id;
+    (*aname).language_id = rec.language_id;
+    (*aname).name_id = rec.name_id;
+    (*aname).string = ctx.font_data[rec.offset..].as_ptr() as *mut c_uchar;
+    (*aname).string_len = rec.len as c_uint;
     0
 }
 

@@ -143,6 +143,11 @@ impl<'a> HoneyFace<'a> {
         self.face.descender()
     }
 
+    /// Access the underlying `ttf_parser::Face`.
+    pub fn raw_face(&self) -> &Face<'a> {
+        &self.face
+    }
+
     /// Retrieve raw OpenType table bytes (e.g. b"GSUB", b"GPOS", b"head").
     pub fn table_data(&self, tag: [u8; 4]) -> Option<&'a [u8]> {
         self.face.raw_face().table(ttf_parser::Tag::from_bytes(&tag))
@@ -160,16 +165,69 @@ impl<'a> HoneyFace<'a> {
         None
     }
 
-    /// Retrieve the font family name if available.
+    /// Retrieve the font family name if available (prioritizing English or first available).
     pub fn family_name(&self) -> Option<String> {
+        let mut english = None;
+        let mut any = None;
         for name in self.face.names() {
             if name.name_id == ttf_parser::name_id::FAMILY {
                 if let Some(s) = name.to_string() {
-                    return Some(s);
+                    if name.language_id == 1033 || name.language_id == 0 {
+                        english = Some(s);
+                        break;
+                    }
+                    if any.is_none() {
+                        any = Some(s);
+                    }
                 }
             }
         }
-        None
+        english.or(any)
+    }
+
+    /// Retrieve the font style (subfamily) name if available (e.g. Regular, Italic, Bold).
+    pub fn style_name(&self) -> Option<String> {
+        let mut english = None;
+        let mut any = None;
+        for name in self.face.names() {
+            if name.name_id == ttf_parser::name_id::SUBFAMILY {
+                if let Some(s) = name.to_string() {
+                    if name.language_id == 1033 || name.language_id == 0 {
+                        english = Some(s);
+                        break;
+                    }
+                    if any.is_none() {
+                        any = Some(s);
+                    }
+                }
+            }
+        }
+        english.or(any)
+    }
+
+    /// Check if font face is marked as italic or oblique.
+    pub fn is_italic(&self) -> bool {
+        self.face.is_italic() || self.face.is_oblique()
+    }
+
+    /// Check if font face is marked as bold.
+    pub fn is_bold(&self) -> bool {
+        self.face.is_bold() || self.face.weight().to_number() >= 700
+    }
+
+    /// Check if font face is monospaced.
+    pub fn is_monospaced(&self) -> bool {
+        self.face.is_monospaced()
+    }
+
+    /// Check if font face has variable axes.
+    pub fn is_variable(&self) -> bool {
+        self.face.is_variable()
+    }
+
+    /// Get typographic weight (100 to 900).
+    pub fn weight(&self) -> u16 {
+        self.face.weight().to_number()
     }
 
     /// Retrieve the glyph name if stored in post table.
@@ -351,4 +409,17 @@ mod tests {
         let res = HoneyFace::from_slice(&[], 0);
         assert!(res.is_err(), "Empty slice must fail parsing");
     }
+
+    #[test]
+    fn test_font_style_and_italic_detection() {
+        let italic_path = "/usr/share/fonts/google-noto-vf/NotoSans-Italic[wght].ttf";
+        if let Ok(bytes) = std::fs::read(italic_path) {
+            let face = HoneyFace::from_slice(&bytes, 0).expect("Failed to parse NotoSans-Italic");
+            assert_eq!(face.family_name(), Some("Noto Sans".to_string()));
+            assert_eq!(face.style_name(), Some("Italic".to_string()));
+            assert!(face.is_italic(), "NotoSans-Italic must be recognized as italic");
+            assert!(!face.is_bold(), "Default weight must not be bold");
+        }
+    }
 }
+

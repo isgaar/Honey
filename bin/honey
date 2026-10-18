@@ -1163,6 +1163,10 @@ install_system() {
 
         ldconfig
 
+        if command_exists fc-cache; then
+            fc-cache -f /usr/share/fonts/google-noto-vf 2>/dev/null || fc-cache -r 2>/dev/null || true
+        fi
+
         # Smoke test inmediato de proteccion del sistema
         local test_bin=""
         for b in /usr/bin/fc-match /usr/bin/fc-list /usr/bin/alacritty /usr/bin/codium; do
