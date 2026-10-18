@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Honey installer
-# Instala la capa tipografica en modo usuario, sin sudo.
+# Permite instalar Honey como reemplazo nativo de bajo nivel (libfreetype.so.6)
+# o mediante el metodo tradicional de usuario (Fontconfig, Electron y sesion).
 
 set -Eeuo pipefail
 
@@ -12,12 +13,19 @@ INSTALL_DIR="${HONEY_HOME:-$HOME/.local/share/honey}"
 BIN_DIR="$PREFIX/bin"
 BIN_PATH="$BIN_DIR/honey"
 
+if [[ -d "$HOME/.cargo/bin" && ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
 green='\033[0;32m'
 yellow='\033[1;33m'
 red='\033[0;31m'
+cyan='\033[0;36m'
+bold='\033[1m'
 reset='\033[0m'
 
 ok() { printf '%bOK%b %s\n' "$green" "$reset" "$1"; }
+info() { printf '%bINFO%b %s\n' "$cyan" "$reset" "$1"; }
 warn() { printf '%bWARN%b %s\n' "$yellow" "$reset" "$1"; }
 fail() { printf '%bERROR%b %s\n' "$red" "$reset" "$1" >&2; exit 1; }
 
@@ -26,25 +34,25 @@ usage() {
 Honey installer
 
 Uso:
-  ./installer.sh install        Instala el comando honey y sus archivos en modo usuario
-  ./installer.sh uninstall      Elimina Honey y su perfil gestionado
-  ./installer.sh install-system Instala Honey Rust Core como reemplazo nativo de libfreetype.so.6 (sudo)
+  ./installer.sh [install]      Inicia la instalacion (menu interactivo o con opcion)
+  ./installer.sh install-native Instala Honey Rust Core como reemplazo nativo de libfreetype.so.6 (sudo)
+  ./installer.sh install-user   Instala Honey en modo tradicional de usuario (sin sudo)
   ./installer.sh status-system  Muestra si el sistema ejecuta Honey Rust Core o FreeType
   ./installer.sh restore-system Restaura libfreetype.so.6 oficial de la distribucion (sudo)
-  ./installer.sh apply          Aplica el perfil tipografico instalado
-  ./installer.sh reset          Retira el perfil tipografico activo
-  ./installer.sh doctor         Revisa dependencias y rutas
+  ./installer.sh apply          Aplica la configuracion tradicional de usuario
+  ./installer.sh reset          Retira la configuracion tradicional de usuario
+  ./installer.sh uninstall      Elimina Honey y restaura configuraciones previas
+  ./installer.sh doctor         Revisa dependencias y estado
   ./installer.sh paths          Muestra rutas usadas por el instalador
   ./installer.sh help           Muestra esta ayuda
 
-Variables:
+Opciones para 'install':
+  --native, --system            Instalacion de bajo nivel (reemplazo libfreetype.so.6 con Rust)
+  --user, --traditional         Instalacion tradicional de usuario (Fontconfig, Electron y sesion)
+
+Variables de entorno:
   HONEY_PREFIX    Prefijo para binarios. Default: ~/.local
   HONEY_HOME      Directorio de instalacion. Default: ~/.local/share/honey
-
-Ejemplos:
-  ./installer.sh install
-  honey apply
-  honey status
 EOF
 }
 
@@ -94,7 +102,36 @@ install_files() {
     ln -sfn "$INSTALL_DIR/bin/honey" "$BIN_PATH"
 }
 
-install_honey() {
+run_honey() {
+    local action="$1"
+    shift || true
+
+    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then
+        "$INSTALL_DIR/bin/honey" "$action" "$@"
+    elif [[ -x "$SOURCE_DIR/bin/honey" ]]; then
+        "$SOURCE_DIR/bin/honey" "$action" "$@"
+    else
+        fail "No se encontro el comando honey"
+    fi
+}
+
+install_native_mode() {
+    info "Preparando instalacion en Modo Nativo de Bajo Nivel (Rust / Quartz Parity)..."
+    install_files
+
+    if [[ $EUID -eq 0 ]]; then
+        run_honey install-system
+    else
+        info "Se requieren privilegios de superusuario para registrar el reemplazo en el sistema."
+        sudo "$INSTALL_DIR/bin/honey" install-system
+    fi
+
+    ok "Instalacion de bajo nivel completada con exito."
+    ok "Todas las aplicaciones del sistema ahora utilizan Honey Rust Core."
+}
+
+install_user_mode() {
+    info "Preparando instalacion en Modo Tradicional de Usuario (Fontconfig / Electron)..."
     install_files
 
     ok "$APP_NAME $APP_VERSION instalado en $INSTALL_DIR"
@@ -104,23 +141,61 @@ install_honey() {
         warn "$BIN_DIR no esta en PATH. Agrega: export PATH=\"$BIN_DIR:\$PATH\""
     fi
 
-    warn "El perfil aun no esta activo. Ejecuta: honey apply"
+    info "Aplicando perfil tipografico en espacio de usuario..."
+    run_honey apply
+
+    ok "Modo tradicional configurado exitosamente."
 }
 
-run_honey() {
-    local action="$1"
+prompt_install_mode() {
+    printf '%b=================================================================%b\n' "$bold" "$reset"
+    printf '%b  Instalador de Honey Tipografia macOS Paridad Quartz v%s        %b\n' "$bold" "$APP_VERSION" "$reset"
+    printf '%b=================================================================%b\n\n' "$bold" "$reset"
+    printf 'Seleccione el metodo de instalacion deseado:\n\n'
+    printf '  %b1) Reemplazo Nativo de Bajo Nivel (Recomendado)%b\n' "$bold" "$reset"
+    printf '     - Sustituye libfreetype.so.6 con el motor Rust de Honey (cdylib).\n'
+    printf '     - Paridad analitica Quartz, dilatacion optica y gamma lineal pura.\n'
+    printf '     - Aplica a TODO el sistema operativo (GTK, Qt, Firefox, Electron).\n'
+    printf '     - Cero parches de configuracion; requiere privilegios sudo.\n\n'
+    printf '  %b2) Modo Tradicional de Usuario (Fontconfig y Parcheado)%b\n' "$bold" "$reset"
+    printf '     - Configura ~/.config/fontconfig/conf.d/99-honey.conf.\n'
+    printf '     - Sincroniza variables FREETYPE_PROPERTIES en sesion y flags de Electron.\n'
+    printf '     - Inyecta hojas de estilo en navegadores (Firefox userChrome.css).\n'
+    printf '     - No requiere privilegios de superusuario (sin sudo).\n\n'
 
-    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then
-        "$INSTALL_DIR/bin/honey" "$action"
-    elif [[ -x "$SOURCE_DIR/bin/honey" ]]; then
-        "$SOURCE_DIR/bin/honey" "$action"
+    local choice=""
+    if [[ -t 0 ]]; then
+        read -r -p "Ingrese su opcion [1 o 2] (Default: 1): " choice
+        choice="${choice:-1}"
     else
-        fail "No se encontro el comando honey"
+        choice="1"
     fi
+
+    case "$choice" in
+        1) install_native_mode ;;
+        2) install_user_mode ;;
+        *)
+            warn "Opcion invalida: $choice. Usando opcion por defecto (1: Nativo)."
+            install_native_mode
+            ;;
+    esac
 }
 
 uninstall_honey() {
-    run_honey reset || true
+    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then
+        "$INSTALL_DIR/bin/honey" reset || true
+    fi
+
+    local conf_file="/etc/ld.so.conf.d/00-honey.conf"
+    local deb_divert="/usr/lib/x86_64-linux-gnu/libfreetype.so.6.distrib"
+    if [[ -f "$conf_file" || -e "$deb_divert" ]]; then
+        info "Detectado reemplazo nativo en sistema. Restaurando..."
+        if [[ $EUID -eq 0 ]]; then
+            run_honey restore-system || true
+        else
+            sudo "$INSTALL_DIR/bin/honey" restore-system || true
+        fi
+    fi
 
     if [[ -L "$BIN_PATH" ]] && [[ "$(readlink "$BIN_PATH")" == "$INSTALL_DIR/bin/honey" ]]; then
         rm -f "$BIN_PATH"
@@ -143,27 +218,58 @@ doctor() {
     printf '\nDependencias:\n'
 
     if command_exists bash; then ok "bash encontrado"; else fail "bash no encontrado"; fi
+    if command_exists cargo; then ok "cargo encontrado"; else warn "cargo no encontrado (requerido para compilar Rust core)"; fi
+    if command_exists gcc; then ok "gcc encontrado"; else warn "gcc no encontrado"; fi
     if command_exists fc-cache; then ok "fc-cache encontrado"; else warn "fc-cache no encontrado"; fi
     if command_exists fc-match; then ok "fc-match encontrado"; else warn "fc-match no encontrado"; fi
     if command_exists git; then ok "git encontrado"; else warn "git no encontrado, solo afecta publicacion/desarrollo"; fi
 
-    printf '\nEstado:\n'
-    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then ok "Honey instalado"; else warn "Honey no instalado"; fi
-    if [[ -L "$BIN_PATH" ]]; then ok "shim honey existe"; else warn "shim honey no existe"; fi
+    printf '\nEstado de componentes:\n'
+    if [[ -x "$INSTALL_DIR/bin/honey" ]]; then ok "Honey CLI instalado en $INSTALL_DIR"; else warn "Honey CLI no instalado"; fi
+    if [[ -L "$BIN_PATH" ]]; then ok "Symlink honey existe en $BIN_PATH"; else warn "Symlink honey no existe"; fi
     if [[ ":$PATH:" == *":$BIN_DIR:"* ]]; then ok "$BIN_DIR esta en PATH"; else warn "$BIN_DIR no esta en PATH"; fi
+
+    printf '\nEstado de motor nativo:\n'
+    run_honey status-system || true
 }
 
 main() {
     local command_name="${1:-install}"
+    shift || true
 
     case "$command_name" in
-        install) install_honey ;;
-        uninstall) uninstall_honey ;;
-        install-system) run_honey install-system "$@" ;;
+        install)
+            local mode=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --native|--system) mode="native" ;;
+                    --user|--traditional) mode="user" ;;
+                    *) warn "Opcion desconocida para install: $1" ;;
+                esac
+                shift || true
+            done
+
+            if [[ "$mode" == "native" ]]; then
+                install_native_mode
+            elif [[ "$mode" == "user" ]]; then
+                install_user_mode
+            else
+                prompt_install_mode
+            fi
+            ;;
+        install-native|install-system) install_native_mode ;;
+        install-user|install-traditional) install_user_mode ;;
         status-system) run_honey status-system "$@" ;;
-        restore-system) run_honey restore-system "$@" ;;
+        restore-system)
+            if [[ $EUID -eq 0 ]]; then
+                run_honey restore-system "$@"
+            else
+                sudo "$INSTALL_DIR/bin/honey" restore-system "$@"
+            fi
+            ;;
         apply) install_files && run_honey apply ;;
         reset) run_honey reset ;;
+        uninstall) uninstall_honey ;;
         doctor) doctor ;;
         paths) print_paths ;;
         help|-h|--help) usage ;;

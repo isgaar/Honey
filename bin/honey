@@ -13,6 +13,9 @@ while [[ -L "$SCRIPT_PATH" ]]; do
 done
 
 ROOT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+if [[ -d "$HOME/.cargo/bin" && ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
 PROFILE_SOURCE="$ROOT_DIR/config/fontconfig/99-honey.conf"
 FONTCONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d"
 PROFILE_TARGET="$FONTCONFIG_DIR/99-honey.conf"
