@@ -26,13 +26,16 @@ usage() {
 Honey installer
 
 Uso:
-  ./installer.sh install      Instala el comando honey y sus archivos
-  ./installer.sh uninstall    Elimina Honey y su perfil gestionado
-  ./installer.sh apply        Aplica el perfil tipografico instalado
-  ./installer.sh reset        Retira el perfil tipografico activo
-  ./installer.sh doctor       Revisa dependencias y rutas
-  ./installer.sh paths        Muestra rutas usadas por el instalador
-  ./installer.sh help         Muestra esta ayuda
+  ./installer.sh install        Instala el comando honey y sus archivos en modo usuario
+  ./installer.sh uninstall      Elimina Honey y su perfil gestionado
+  ./installer.sh install-system Instala Honey Rust Core como reemplazo nativo de libfreetype.so.6 (sudo)
+  ./installer.sh status-system  Muestra si el sistema ejecuta Honey Rust Core o FreeType
+  ./installer.sh restore-system Restaura libfreetype.so.6 oficial de la distribucion (sudo)
+  ./installer.sh apply          Aplica el perfil tipografico instalado
+  ./installer.sh reset          Retira el perfil tipografico activo
+  ./installer.sh doctor         Revisa dependencias y rutas
+  ./installer.sh paths          Muestra rutas usadas por el instalador
+  ./installer.sh help           Muestra esta ayuda
 
 Variables:
   HONEY_PREFIX    Prefijo para binarios. Default: ~/.local
@@ -82,6 +85,8 @@ install_files() {
     copy_tree "examples"
     copy_tree "native"
     copy_tree "crates"
+    copy_tree "shaders"
+    copy_tree "packages"
 
     chmod +x "$INSTALL_DIR/bin/honey"
     chmod +x "$INSTALL_DIR/installer.sh"
@@ -154,6 +159,9 @@ main() {
     case "$command_name" in
         install) install_honey ;;
         uninstall) uninstall_honey ;;
+        install-system) run_honey install-system "$@" ;;
+        status-system) run_honey status-system "$@" ;;
+        restore-system) run_honey restore-system "$@" ;;
         apply) install_files && run_honey apply ;;
         reset) run_honey reset ;;
         doctor) doctor ;;
