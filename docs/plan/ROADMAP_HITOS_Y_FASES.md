@@ -59,4 +59,8 @@ Este documento define la planificacion temporal, los hitos de verificacion y el 
   - Comandos del CLI: `honey profile set gnome`, `honey profile set kde`, `honey profile status`.
   - Calibracion especifica para GNOME (Mutter supersampling, Cairo stride de 4 bytes, Adwaita Dark Mode).
   - Calibracion especifica para KDE Plasma (QtQuick Distance Fields, KWin fractional scaling, Noto Sans).
-- **Criterio de Aceptacion:** Pruebas visuales y de rendimiento en sesiones nativas de GNOME 46+ y KDE Plasma 6+.
+  - Paridad de tablas SFNT (`head`, `maxp`, `os2`, `hhea`, `post`) en `FT_Get_Sfnt_Table` y nombres SFNT en `FT_Get_Sfnt_Name`.
+  - Resolucion de discriminacion de estilo (regular vs cursiva) en Fontconfig para familias variables de Google Noto.
+  - Correccion de calculo de altura de linea y metricas verticales en navegadores basados en Gecko (Zen Browser, Firefox).
+- **Criterio de Aceptacion:** Pruebas visuales y de rendimiento en sesiones nativas de GNOME 46+ y KDE Plasma 6+ con seleccion fidedigna de fuentes regulares y cuadros de dialogo sin solapamiento de texto.
+

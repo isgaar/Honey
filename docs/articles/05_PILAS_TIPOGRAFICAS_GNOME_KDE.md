@@ -95,3 +95,28 @@ honey profile set kde
 1. **Fidelidad Vectorial para Distance Fields:** Precision de coma flotante continua en `FT_Outline_Decompose` para optimizar `QSGDistanceFieldGlyphCache`.
 2. **Curva de Dilatacion Estandar 1:1:** Curva pura de Quartz adaptada al escalado geometrico nativo de KWin sin reescalado de framebuffer.
 3. **Sincronizacion SFNT con QFontEngineFT:** Extraccion completa de metricas de diseno para fuentes variables de Google Noto (`NotoSans[wght].ttf`).
+
+---
+
+## 5. Resolucion de Compatibilidad: Metadatos SFNT y Motores de Diseno (Gecko y GTK)
+
+Durante las pruebas de validacion de escritorio en vivo (GNOME 46 y navegadores basados en Gecko como Zen Browser y Firefox), se diagnosticaron y resolvieron dos anomalias criticas en la capa de compatibilidad C ABI ([crates/honey-shim](../../crates/honey-shim)):
+
+### 5.1 Discriminacion de Estilo y Nombres SFNT en Fontconfig
+- **Diagnostico:** Las fuentes variables modernas de Google Noto (`NotoSans[wght].ttf` y `NotoSans-Italic[wght].ttf`) son indexadas por Fontconfig mediante la llamada a `FT_Get_Sfnt_Name` y la inspeccion de los flags `style_flags` y de la tabla `OS/2` (`fsSelection`). Al retornar valores estaticos de "Regular", Fontconfig asignaba ponderacion neutra (`slant: 0`) a la variante cursiva, provocando que `fc-match sans-serif` seleccionara `NotoSans-Italic[wght].ttf` como fuente del sistema en aplicaciones GTK/GNOME (Nautilus, Configuracion).
+- **Solucion Implementada:**
+  1. Extraccion dinamica de la tabla de nombres SFNT (`name`) con punteros crudos sin copia de memoria mediante `FT_Get_Sfnt_Name_Count` y `FT_Get_Sfnt_Name`.
+  2. Deteccion rigurosa de estilo en [crates/honey-core](../../crates/honey-core): identificacion de `is_italic`, `is_bold`, `is_monospaced`, `is_variable`, `weight` y nombre de subfamilia tipografica.
+  3. Mapeo exacto de `FT_STYLE_FLAG_ITALIC` y `FT_STYLE_FLAG_BOLD` en `face->style_flags`.
+
+### 5.2 Decodificacion de Tablas SFNT para el Calculo de Altura de Linea en Gecko
+- **Diagnostico:** En motores de navegacion como Gecko (`gfxFT2FontBase.cpp`), el calculo de metricas tipograficas (`mMetrics.emAscent`, `mMetrics.emDescent`) y la escala de conversion vertical (`yScale`) dependen estrictamente de consultar las tablas binarias mediante `FT_Get_Sfnt_Table(face, FT_SFNT_HEAD)` y `FT_Get_Sfnt_Table(face, FT_SFNT_OS2)`. Al recibir punteros nulos para `head`, `yScale` colapsaba a cero, provocando que los textos multilinea en cuadros de dialogo modales (permisos de almacenamiento, alertas XUL) se dibujaran colapsados sobre la misma linea base horizontal.
+- **Solucion Implementada:**
+  1. Soporte completo de las 5 tablas SFNT principales en `FT_Get_Sfnt_Table`:
+     - `FT_SFNT_HEAD` (tag 0): version, revision, `Magic_Number` (0x5F0F3CF5), `Units_Per_EM`, caja delimitadora global (`xMin`, `yMin`, `xMax`, `yMax`).
+     - `FT_SFNT_MAXP` (tag 1): perfil de complejidad (`numGlyphs`, `maxPoints`, `maxContours`, etc.).
+     - `FT_SFNT_OS2` (tag 2): metricas tipograficas `sTypoAscender`, `sTypoDescender`, `sTypoLineGap`, rangos Unicode y Panose con alineacion binaria C de 64 bits.
+     - `FT_SFNT_HHEA` (tag 3): `Ascender`, `Descender`, `Line_Gap`, `advance_Width_Max`.
+     - `FT_SFNT_POST` (tag 5): `underlinePosition`, `underlineThickness`, `italicAngle`, `isFixedPitch`.
+  2. Sincronizacion de metricas en `face->max_advance_width`, `face->height`, `face->underline_position` y `face->underline_thickness` para paridad completa con la salida nativa de FreeType.
+

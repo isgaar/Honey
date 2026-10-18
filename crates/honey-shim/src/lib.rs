@@ -422,6 +422,225 @@ fn parse_os2_table(data: &[u8]) -> Option<TT_OS2> {
     })
 }
 
+#[repr(C)]
+pub struct TT_Header {
+    pub Table_Version: c_long,
+    pub Font_Revision: c_long,
+    pub CheckSum_Adjust: c_long,
+    pub Magic_Number: c_long,
+    pub Flags: c_ushort,
+    pub Units_Per_EM: c_ushort,
+    pub Created: [c_ulong; 2],
+    pub Modified: [c_ulong; 2],
+    pub xMin: c_short,
+    pub yMin: c_short,
+    pub xMax: c_short,
+    pub yMax: c_short,
+    pub Mac_Style: c_ushort,
+    pub Lowest_Rec_PPEM: c_ushort,
+    pub Font_Direction: c_short,
+    pub Index_To_Loc_Format: c_short,
+    pub Glyph_Data_Format: c_short,
+}
+
+#[repr(C)]
+pub struct TT_HoriHeader {
+    pub Version: c_long,
+    pub Ascender: c_short,
+    pub Descender: c_short,
+    pub Line_Gap: c_short,
+    pub advance_Width_Max: c_ushort,
+    pub min_Left_Side_Bearing: c_short,
+    pub min_Right_Side_Bearing: c_short,
+    pub xMax_Extent: c_short,
+    pub caret_Slope_Rise: c_short,
+    pub caret_Slope_Run: c_short,
+    pub caret_Offset: c_short,
+    pub Reserved: [c_short; 4],
+    pub metric_Data_Format: c_short,
+    pub number_Of_HMetrics: c_ushort,
+    pub long_metrics: *mut c_void,
+    pub short_metrics: *mut c_void,
+}
+
+#[repr(C)]
+pub struct TT_Postscript {
+    pub FormatType: c_long,
+    pub italicAngle: c_long,
+    pub underlinePosition: c_short,
+    pub underlineThickness: c_short,
+    pub isFixedPitch: c_ulong,
+    pub minMemType42: c_ulong,
+    pub maxMemType42: c_ulong,
+    pub minMemType1: c_ulong,
+    pub maxMemType1: c_ulong,
+}
+
+#[repr(C)]
+pub struct TT_MaxProfile {
+    pub version: c_long,
+    pub numGlyphs: c_ushort,
+    pub maxPoints: c_ushort,
+    pub maxContours: c_ushort,
+    pub maxCompositePoints: c_ushort,
+    pub maxCompositeContours: c_ushort,
+    pub maxZones: c_ushort,
+    pub maxTwilightPoints: c_ushort,
+    pub maxStorage: c_ushort,
+    pub maxFunctionDefs: c_ushort,
+    pub maxInstructionDefs: c_ushort,
+    pub maxStackElements: c_ushort,
+    pub maxSizeOfInstructions: c_ushort,
+    pub maxComponentElements: c_ushort,
+    pub maxComponentDepth: c_ushort,
+}
+
+fn parse_head_table(data: &[u8]) -> Option<TT_Header> {
+    if data.len() < 54 {
+        return None;
+    }
+    let read_u16 = |off: usize| -> u16 {
+        u16::from_be_bytes([data[off], data[off + 1]])
+    };
+    let read_i16 = |off: usize| -> i16 { read_u16(off) as i16 };
+    let read_u32 = |off: usize| -> u32 {
+        u32::from_be_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+    };
+    let read_i32 = |off: usize| -> i32 { read_u32(off) as i32 };
+
+    Some(TT_Header {
+        Table_Version: read_i32(0) as c_long,
+        Font_Revision: read_i32(4) as c_long,
+        CheckSum_Adjust: read_i32(8) as c_long,
+        Magic_Number: read_u32(12) as c_long,
+        Flags: read_u16(16),
+        Units_Per_EM: read_u16(18),
+        Created: [read_u32(20) as c_ulong, read_u32(24) as c_ulong],
+        Modified: [read_u32(28) as c_ulong, read_u32(32) as c_ulong],
+        xMin: read_i16(36),
+        yMin: read_i16(38),
+        xMax: read_i16(40),
+        yMax: read_i16(42),
+        Mac_Style: read_u16(44),
+        Lowest_Rec_PPEM: read_u16(46),
+        Font_Direction: read_i16(48),
+        Index_To_Loc_Format: read_i16(50),
+        Glyph_Data_Format: read_i16(52),
+    })
+}
+
+fn parse_hhea_table(data: &[u8]) -> Option<TT_HoriHeader> {
+    if data.len() < 36 {
+        return None;
+    }
+    let read_u16 = |off: usize| -> u16 {
+        u16::from_be_bytes([data[off], data[off + 1]])
+    };
+    let read_i16 = |off: usize| -> i16 { read_u16(off) as i16 };
+    let read_i32 = |off: usize| -> i32 {
+        i32::from_be_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+    };
+
+    Some(TT_HoriHeader {
+        Version: read_i32(0) as c_long,
+        Ascender: read_i16(4),
+        Descender: read_i16(6),
+        Line_Gap: read_i16(8),
+        advance_Width_Max: read_u16(10),
+        min_Left_Side_Bearing: read_i16(12),
+        min_Right_Side_Bearing: read_i16(14),
+        xMax_Extent: read_i16(16),
+        caret_Slope_Rise: read_i16(18),
+        caret_Slope_Run: read_i16(20),
+        caret_Offset: read_i16(22),
+        Reserved: [read_i16(24), read_i16(26), read_i16(28), read_i16(30)],
+        metric_Data_Format: read_i16(32),
+        number_Of_HMetrics: read_u16(34),
+        long_metrics: ptr::null_mut(),
+        short_metrics: ptr::null_mut(),
+    })
+}
+
+fn parse_post_table(data: &[u8]) -> Option<TT_Postscript> {
+    if data.len() < 32 {
+        return None;
+    }
+    let read_u16 = |off: usize| -> u16 {
+        u16::from_be_bytes([data[off], data[off + 1]])
+    };
+    let read_i16 = |off: usize| -> i16 { read_u16(off) as i16 };
+    let read_u32 = |off: usize| -> u32 {
+        u32::from_be_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+    };
+    let read_i32 = |off: usize| -> i32 { read_u32(off) as i32 };
+
+    Some(TT_Postscript {
+        FormatType: read_i32(0) as c_long,
+        italicAngle: read_i32(4) as c_long,
+        underlinePosition: read_i16(8),
+        underlineThickness: read_i16(10),
+        isFixedPitch: read_u32(12) as c_ulong,
+        minMemType42: read_u32(16) as c_ulong,
+        maxMemType42: read_u32(20) as c_ulong,
+        minMemType1: read_u32(24) as c_ulong,
+        maxMemType1: read_u32(28) as c_ulong,
+    })
+}
+
+fn parse_maxp_table(data: &[u8]) -> Option<TT_MaxProfile> {
+    if data.len() < 6 {
+        return None;
+    }
+    let read_u16 = |off: usize| -> u16 {
+        u16::from_be_bytes([data[off], data[off + 1]])
+    };
+    let read_u32 = |off: usize| -> u32 {
+        u32::from_be_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+    };
+
+    let ver = read_u32(0);
+    let num_glyphs = read_u16(4);
+
+    let (max_points, max_contours, max_comp_pts, max_comp_contours, max_zones, max_twilight, max_storage, max_func_defs, max_instr_defs, max_stack, max_size_instr, max_comp_elem, max_comp_depth) =
+        if data.len() >= 32 {
+            (
+                read_u16(6),
+                read_u16(8),
+                read_u16(10),
+                read_u16(12),
+                read_u16(14),
+                read_u16(16),
+                read_u16(18),
+                read_u16(20),
+                read_u16(22),
+                read_u16(24),
+                read_u16(26),
+                read_u16(28),
+                read_u16(30),
+            )
+        } else {
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        };
+
+    Some(TT_MaxProfile {
+        version: ver as c_long,
+        numGlyphs: num_glyphs,
+        maxPoints: max_points,
+        maxContours: max_contours,
+        maxCompositePoints: max_comp_pts,
+        maxCompositeContours: max_comp_contours,
+        maxZones: max_zones,
+        maxTwilightPoints: max_twilight,
+        maxStorage: max_storage,
+        maxFunctionDefs: max_func_defs,
+        maxInstructionDefs: max_instr_defs,
+        maxStackElements: max_stack,
+        maxSizeOfInstructions: max_size_instr,
+        maxComponentElements: max_comp_elem,
+        maxComponentDepth: max_comp_depth,
+    })
+}
+
 /// Internal state holding font bytes, metrics, and rasterization properties.
 pub struct FaceContext {
     pub font_data: Vec<u8>,
@@ -438,6 +657,10 @@ pub struct FaceContext {
     pub transform_delta: Option<FT_Vector>,
     pub sfnt_names: Vec<SfntNameRecord>,
     pub os2_table: Option<Box<TT_OS2>>,
+    pub head_table: Option<Box<TT_Header>>,
+    pub hhea_table: Option<Box<TT_HoriHeader>>,
+    pub post_table: Option<Box<TT_Postscript>>,
+    pub maxp_table: Option<Box<TT_MaxProfile>>,
 }
 
 struct OutlineAccumulator {
@@ -808,7 +1031,7 @@ fn init_face_from_bytes(
     }
 
     let actual_index = (face_index.max(0) & 0xFFFF) as u32;
-    let (num_glyphs, units_per_em, ascender, descender, family_name, style_name, is_italic, is_bold, is_mono, is_var, sfnt_names, os2_table) =
+    let (num_glyphs, units_per_em, ascender, descender, family_name, style_name, is_italic, is_bold, is_mono, is_var, sfnt_names, os2_table, head_table, hhea_table, post_table, maxp_table) =
         match HoneyFace::from_slice(&font_bytes, actual_index) {
             Ok(f) => {
                 let base_ptr = font_bytes.as_ptr() as usize;
@@ -841,6 +1064,10 @@ fn init_face_from_bytes(
                     }
                 });
                 let os2 = f.table_data(*b"OS/2").and_then(parse_os2_table).map(Box::new);
+                let head = f.table_data(*b"head").and_then(parse_head_table).map(Box::new);
+                let hhea = f.table_data(*b"hhea").and_then(parse_hhea_table).map(Box::new);
+                let post = f.table_data(*b"post").and_then(parse_post_table).map(Box::new);
+                let maxp = f.table_data(*b"maxp").and_then(parse_maxp_table).map(Box::new);
                 (
                     f.number_of_glyphs() as c_long,
                     f.units_per_em(),
@@ -854,6 +1081,10 @@ fn init_face_from_bytes(
                     f.is_variable(),
                     names,
                     os2,
+                    head,
+                    hhea,
+                    post,
+                    maxp,
                 )
             }
             Err(_) => return 3, // Unknown file format
@@ -861,6 +1092,24 @@ fn init_face_from_bytes(
 
     let upem = units_per_em.max(1) as f32;
     let initial_scale_16 = ((16.0 / upem) * 65536.0) as c_long;
+
+    let max_adv_w = hhea_table
+        .as_ref()
+        .map(|h| h.advance_Width_Max as c_short)
+        .unwrap_or(units_per_em as c_short);
+
+    let typo_asc = hhea_table
+        .as_ref()
+        .map(|h| h.Ascender)
+        .unwrap_or(ascender);
+
+    let typo_desc = hhea_table
+        .as_ref()
+        .map(|h| h.Descender)
+        .unwrap_or(descender);
+
+    let typo_gap = hhea_table.as_ref().map(|h| h.Line_Gap).unwrap_or(0);
+    let face_h = typo_asc - typo_desc + typo_gap;
 
     let mut context = Box::new(FaceContext {
         font_data: font_bytes,
@@ -885,10 +1134,10 @@ fn init_face_from_bytes(
                 y_ppem: 16,
                 x_scale: initial_scale_16,
                 y_scale: initial_scale_16,
-                ascender: (((ascender as f32 / upem) * 16.0 * 64.0) as c_long),
-                descender: (((descender as f32 / upem) * 16.0 * 64.0) as c_long),
-                height: (((ascender - descender) as f32 / upem * 16.0 * 64.0) as c_long),
-                max_advance: 16 << 6,
+                ascender: (((typo_asc as f32 / upem) * 16.0 * 64.0) as c_long),
+                descender: (((typo_desc as f32 / upem) * 16.0 * 64.0) as c_long),
+                height: (((face_h as f32 / upem) * 16.0 * 64.0) as c_long),
+                max_advance: (((max_adv_w as f32 / upem) * 16.0 * 64.0) as c_long),
             },
             internal: ptr::null_mut(),
         },
@@ -896,6 +1145,10 @@ fn init_face_from_bytes(
         transform_delta: None,
         sfnt_names,
         os2_table,
+        head_table,
+        hhea_table,
+        post_table,
+        maxp_table,
     });
 
     let slot = Box::new(FT_GlyphSlotRec {
@@ -978,19 +1231,19 @@ fn init_face_from_bytes(
         charmaps: context.charmaps_array.as_mut_ptr(),
         generic: [0; 2],
         bbox: FT_BBox {
-            xMin: 0,
-            yMin: descender as c_long,
-            xMax: units_per_em as c_long,
-            yMax: ascender as c_long,
+            xMin: context.head_table.as_ref().map(|h| h.xMin as c_long).unwrap_or(0),
+            yMin: context.head_table.as_ref().map(|h| h.yMin as c_long).unwrap_or(typo_desc as c_long),
+            xMax: context.head_table.as_ref().map(|h| h.xMax as c_long).unwrap_or(units_per_em as c_long),
+            yMax: context.head_table.as_ref().map(|h| h.yMax as c_long).unwrap_or(typo_asc as c_long),
         },
         units_per_EM: units_per_em,
-        ascender,
-        descender,
-        height: ascender - descender,
-        max_advance_width: units_per_em as c_short,
-        max_advance_height: (ascender - descender) as c_short,
-        underline_position: -100,
-        underline_thickness: 50,
+        ascender: typo_asc,
+        descender: typo_desc,
+        height: face_h,
+        max_advance_width: max_adv_w,
+        max_advance_height: face_h,
+        underline_position: context.post_table.as_ref().map(|p| p.underlinePosition).unwrap_or(-100),
+        underline_thickness: context.post_table.as_ref().map(|p| p.underlineThickness).unwrap_or(50),
         glyph: slot_raw,
         size: &mut context.size_obj as *mut FT_SizeRec,
         charmap: &mut context.charmap_obj as *mut FT_CharMapRec,
@@ -1073,7 +1326,7 @@ pub extern "C" fn FT_Set_Pixel_Sizes(
             (*ctx).size_obj.metrics.y_scale = scale_16;
             (*ctx).size_obj.metrics.ascender = (((*face).ascender as f32 / upem) * px * 64.0) as c_long;
             (*ctx).size_obj.metrics.descender = (((*face).descender as f32 / upem) * px * 64.0) as c_long;
-            (*ctx).size_obj.metrics.height = ((((*face).ascender - (*face).descender) as f32 / upem) * px * 64.0) as c_long;
+            (*ctx).size_obj.metrics.height = (((*face).height as f32 / upem) * px * 64.0) as c_long;
             (*ctx).size_obj.metrics.max_advance = (((*face).max_advance_width as f32 / upem) * px * 64.0) as c_long;
         }
     }
@@ -1397,10 +1650,33 @@ pub unsafe extern "C" fn FT_Get_Sfnt_Table(face: *mut FT_FaceRec, tag: c_uint) -
         Some(c) => c,
         None => return ptr::null_mut(),
     };
-    if tag == FT_SFNT_OS2 {
-        if let Some(ref mut os2) = ctx.os2_table {
-            return os2.as_mut() as *mut TT_OS2 as *mut c_void;
+    match tag {
+        FT_SFNT_HEAD => {
+            if let Some(ref mut head) = ctx.head_table {
+                return head.as_mut() as *mut TT_Header as *mut c_void;
+            }
         }
+        FT_SFNT_MAXP => {
+            if let Some(ref mut maxp) = ctx.maxp_table {
+                return maxp.as_mut() as *mut TT_MaxProfile as *mut c_void;
+            }
+        }
+        FT_SFNT_OS2 => {
+            if let Some(ref mut os2) = ctx.os2_table {
+                return os2.as_mut() as *mut TT_OS2 as *mut c_void;
+            }
+        }
+        FT_SFNT_HHEA => {
+            if let Some(ref mut hhea) = ctx.hhea_table {
+                return hhea.as_mut() as *mut TT_HoriHeader as *mut c_void;
+            }
+        }
+        FT_SFNT_POST => {
+            if let Some(ref mut post) = ctx.post_table {
+                return post.as_mut() as *mut TT_Postscript as *mut c_void;
+            }
+        }
+        _ => {}
     }
     ptr::null_mut()
 }
