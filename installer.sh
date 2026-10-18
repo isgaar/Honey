@@ -123,15 +123,37 @@ run_honey() {
 
 ensure_rust_binary_built() {
     local source_shim="$SOURCE_DIR/target/release/libhoney_shim.so"
-    if [[ ! -f "$source_shim" ]]; then
-        info "Compilando Honey Rust Core en perfil release como usuario..."
-        local cargo_cmd="cargo"
-        if ! command -v cargo >/dev/null 2>&1 && [[ -x "$HOME/.cargo/bin/cargo" ]]; then
-            cargo_cmd="$HOME/.cargo/bin/cargo"
-        fi
-        (cd "$SOURCE_DIR" && "$cargo_cmd" build --release -p honey-shim)
+
+    if [[ -f "$source_shim" ]]; then
+        ok "Binario compilado verificado: $source_shim"
+        return 0
     fi
-    [[ -f "$source_shim" ]] || fail "No se pudo compilar $source_shim"
+
+    local cargo_cmd="cargo"
+    local rustup_env=()
+
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        local user_home
+        user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+        if [[ -x "$user_home/.cargo/bin/cargo" ]]; then
+            cargo_cmd="$user_home/.cargo/bin/cargo"
+            export PATH="$user_home/.cargo/bin:$PATH"
+            rustup_env=(RUSTUP_HOME="$user_home/.rustup" CARGO_HOME="$user_home/.cargo")
+        fi
+    fi
+    if [[ ! -x "$cargo_cmd" && -x "$HOME/.cargo/bin/cargo" ]]; then
+        cargo_cmd="$HOME/.cargo/bin/cargo"
+        export PATH="$HOME/.cargo/bin:$PATH"
+    fi
+
+    if command -v "$cargo_cmd" >/dev/null 2>&1 || [[ -x "$cargo_cmd" ]]; then
+        info "Compilando Honey Rust Core en perfil release..."
+        (cd "$SOURCE_DIR" && env "${rustup_env[@]}" "$cargo_cmd" build --release -p honey-shim)
+    else
+        fail "No se encontro 'cargo' ni el binario precompilado en $source_shim"
+    fi
+
+    [[ -f "$source_shim" ]] || fail "No se pudo verificar el binario compilado en $source_shim"
     ok "Binario compilado verificado: $source_shim"
 }
 

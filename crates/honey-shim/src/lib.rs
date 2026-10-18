@@ -12,7 +12,12 @@ use std::fs;
 use std::ptr;
 use std::slice;
 
-pub const FT_GLYPH_FORMAT_BITMAP: c_uint = 0x6269_746d; // 'bitm'
+extern "C" {
+    fn calloc(nmemb: usize, size: usize) -> *mut c_void;
+    fn free(ptr: *mut c_void);
+}
+
+pub const FT_GLYPH_FORMAT_BITMAP: c_uint = 0x6269_7473; // 'bits'
 pub const FT_GLYPH_FORMAT_OUTLINE: c_uint = 0x6f75_746c; // 'outl'
 pub const FT_PIXEL_MODE_GRAY: c_uchar = 2;
 
@@ -233,6 +238,7 @@ pub struct FT_OutlineGlyphRec {
 /// Internal state holding font bytes, metrics, and rasterization properties.
 pub struct FaceContext {
     pub font_data: Vec<u8>,
+    pub actual_face_index: u32,
     pub pixel_size: f32,
     pub last_bitmap_buffer: Vec<u8>,
     pub outline_points: Vec<FT_Vector>,
@@ -463,6 +469,43 @@ pub extern "C" fn FT_New_Face(
     init_face_from_bytes(font_bytes, face_index, aface)
 }
 
+#[repr(C)]
+pub struct FT_Open_Args {
+    pub flags: c_uint,
+    pub memory_base: *const c_uchar,
+    pub memory_size: c_long,
+    pub pathname: *mut c_char,
+    pub stream: *mut c_void,
+    pub driver: *mut c_void,
+    pub num_params: c_int,
+    pub params: *mut c_void,
+}
+
+pub const FT_OPEN_MEMORY: c_uint = 0x1;
+pub const FT_OPEN_STREAM: c_uint = 0x2;
+pub const FT_OPEN_PATHNAME: c_uint = 0x4;
+pub const FT_OPEN_DRIVER: c_uint = 0x8;
+pub const FT_OPEN_PARAMS: c_uint = 0x10;
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Open_Face(
+    library: *mut c_void,
+    args: *const FT_Open_Args,
+    face_index: c_long,
+    aface: *mut *mut FT_FaceRec,
+) -> c_int {
+    if args.is_null() || aface.is_null() {
+        return 1;
+    }
+    if ((*args).flags & FT_OPEN_MEMORY) != 0 && !(*args).memory_base.is_null() && (*args).memory_size > 0 {
+        return FT_New_Memory_Face(library, (*args).memory_base, (*args).memory_size, face_index, aface);
+    }
+    if ((*args).flags & FT_OPEN_PATHNAME) != 0 && !(*args).pathname.is_null() {
+        return FT_New_Face(library, (*args).pathname, face_index, aface);
+    }
+    1
+}
+
 fn init_face_from_bytes(
     font_bytes: Vec<u8>,
     face_index: c_long,
@@ -512,7 +555,7 @@ fn init_face_from_bytes(
         return 0; // FT_Err_Ok
     }
 
-    let actual_index = (face_index & 0xFFFF) as u32;
+    let actual_index = (face_index.max(0) & 0xFFFF) as u32;
     let (num_glyphs, units_per_em, ascender, descender, family_name, style_name) =
         match HoneyFace::from_slice(&font_bytes, actual_index) {
             Ok(f) => (
@@ -526,8 +569,12 @@ fn init_face_from_bytes(
             Err(_) => return 3, // Unknown file format
         };
 
+    let upem = units_per_em.max(1) as f32;
+    let initial_scale_16 = ((16.0 / upem) * 65536.0) as c_long;
+
     let mut context = Box::new(FaceContext {
         font_data: font_bytes,
+        actual_face_index: actual_index,
         pixel_size: 16.0,
         last_bitmap_buffer: Vec::new(),
         outline_points: Vec::new(),
@@ -546,11 +593,11 @@ fn init_face_from_bytes(
             metrics: FT_Size_Metrics {
                 x_ppem: 16,
                 y_ppem: 16,
-                x_scale: 0x10000,
-                y_scale: 0x10000,
-                ascender: (ascender as c_long) << 6,
-                descender: (descender as c_long) << 6,
-                height: ((ascender - descender) as c_long) << 6,
+                x_scale: initial_scale_16,
+                y_scale: initial_scale_16,
+                ascender: (((ascender as f32 / upem) * 16.0 * 64.0) as c_long),
+                descender: (((descender as f32 / upem) * 16.0 * 64.0) as c_long),
+                height: (((ascender - descender) as f32 / upem * 16.0 * 64.0) as c_long),
                 max_advance: 16 << 6,
             },
             internal: ptr::null_mut(),
@@ -705,9 +752,18 @@ pub extern "C" fn FT_Set_Pixel_Sizes(
     unsafe {
         let ctx = (*face).internal;
         if !ctx.is_null() {
-            (*ctx).pixel_size = target.max(4.0);
-            (*ctx).size_obj.metrics.x_ppem = (*ctx).pixel_size as c_ushort;
-            (*ctx).size_obj.metrics.y_ppem = (*ctx).pixel_size as c_ushort;
+            let px = target.max(4.0);
+            (*ctx).pixel_size = px;
+            let upem = (*face).units_per_EM.max(1) as f32;
+            let scale_16 = ((px / upem) * 65536.0) as c_long;
+            (*ctx).size_obj.metrics.x_ppem = px as c_ushort;
+            (*ctx).size_obj.metrics.y_ppem = px as c_ushort;
+            (*ctx).size_obj.metrics.x_scale = scale_16;
+            (*ctx).size_obj.metrics.y_scale = scale_16;
+            (*ctx).size_obj.metrics.ascender = (((*face).ascender as f32 / upem) * px * 64.0) as c_long;
+            (*ctx).size_obj.metrics.descender = (((*face).descender as f32 / upem) * px * 64.0) as c_long;
+            (*ctx).size_obj.metrics.height = ((((*face).ascender - (*face).descender) as f32 / upem) * px * 64.0) as c_long;
+            (*ctx).size_obj.metrics.max_advance = (((*face).max_advance_width as f32 / upem) * px * 64.0) as c_long;
         }
     }
     0
@@ -731,9 +787,18 @@ pub extern "C" fn FT_Set_Char_Size(
     unsafe {
         let ctx = (*face).internal;
         if !ctx.is_null() {
-            (*ctx).pixel_size = px.max(4.0);
-            (*ctx).size_obj.metrics.x_ppem = (*ctx).pixel_size as c_ushort;
-            (*ctx).size_obj.metrics.y_ppem = (*ctx).pixel_size as c_ushort;
+            let px_clamped = px.max(4.0);
+            (*ctx).pixel_size = px_clamped;
+            let upem = (*face).units_per_EM.max(1) as f32;
+            let scale_16 = ((px_clamped / upem) * 65536.0) as c_long;
+            (*ctx).size_obj.metrics.x_ppem = px_clamped as c_ushort;
+            (*ctx).size_obj.metrics.y_ppem = px_clamped as c_ushort;
+            (*ctx).size_obj.metrics.x_scale = scale_16;
+            (*ctx).size_obj.metrics.y_scale = scale_16;
+            (*ctx).size_obj.metrics.ascender = (((*face).ascender as f32 / upem) * px_clamped * 64.0) as c_long;
+            (*ctx).size_obj.metrics.descender = (((*face).descender as f32 / upem) * px_clamped * 64.0) as c_long;
+            (*ctx).size_obj.metrics.height = ((((*face).ascender - (*face).descender) as f32 / upem) * px_clamped * 64.0) as c_long;
+            (*ctx).size_obj.metrics.max_advance = (((*face).max_advance_width as f32 / upem) * px_clamped * 64.0) as c_long;
         }
     }
     0
@@ -749,7 +814,7 @@ pub extern "C" fn FT_Get_Char_Index(face: *mut FT_FaceRec, charcode: c_ulong) ->
         if ctx.is_null() {
             return 0;
         }
-        if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
             if let Some(ch) = char::from_u32(charcode as u32) {
                 return hf.glyph_index(ch).unwrap_or(0);
             }
@@ -788,7 +853,7 @@ pub unsafe extern "C" fn FT_Get_Next_Char(
         }
         return 0;
     }
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         let start = (char_code as u32).saturating_add(1);
         for code in start..=0x10FFFF {
             if let Some(ch) = char::from_u32(code) {
@@ -830,7 +895,7 @@ pub unsafe extern "C" fn FT_Load_Glyph(
     (*slot).glyph_index = glyph_index;
     let scale = (*ctx).pixel_size / ((*face).units_per_EM.max(1) as f32);
 
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         let mut accum = OutlineAccumulator::new(scale);
         let _ = hf.outline_glyph(glyph_index, &mut accum);
         accum.close();
@@ -851,6 +916,11 @@ pub unsafe extern "C" fn FT_Load_Glyph(
             (*slot).metrics.height = (((y_max - y_min) as f32 * scale) * 64.0) as c_long;
             (*slot).metrics.horiBearingX = ((x_min as f32 * scale) * 64.0) as c_long;
             (*slot).metrics.horiBearingY = ((y_max as f32 * scale) * 64.0) as c_long;
+        } else {
+            (*slot).metrics.width = 0;
+            (*slot).metrics.height = 0;
+            (*slot).metrics.horiBearingX = 0;
+            (*slot).metrics.horiBearingY = 0;
         }
 
         let adv = hf.glyph_hor_advance(glyph_index).unwrap_or(0) as f32 * scale;
@@ -892,14 +962,36 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
         let gid = (*slot).glyph_index;
         let px_size = (*ctx).pixel_size;
 
-        if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+        if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
             if let Some((bmp, left, top, adv)) = hf.render_glyph(gid, px_size, 0.0, 0.0) {
-                (*ctx).last_bitmap_buffer = bmp.buffer;
+                // Row stride/pitch MUST be divisible by 4 for Cairo/Pango image surfaces
+                let pitch = ((bmp.width + 3) & !3) as usize;
+                let height = bmp.height as usize;
+                let padded_len = pitch * height;
+
+                (*ctx).last_bitmap_buffer.clear();
+                (*ctx).last_bitmap_buffer.resize(padded_len, 0);
+
+                if bmp.width > 0 && height > 0 {
+                    for y in 0..height {
+                        let src_start = y * (bmp.width as usize);
+                        let dst_start = y * pitch;
+                        ptr::copy_nonoverlapping(
+                            bmp.buffer.as_ptr().add(src_start),
+                            (*ctx).last_bitmap_buffer.as_mut_ptr().add(dst_start),
+                            bmp.width as usize,
+                        );
+                    }
+                }
 
                 (*slot).bitmap.width = bmp.width as c_uint;
                 (*slot).bitmap.rows = bmp.height as c_uint;
-                (*slot).bitmap.pitch = bmp.width as c_int;
-                (*slot).bitmap.buffer = (*ctx).last_bitmap_buffer.as_mut_ptr();
+                (*slot).bitmap.pitch = pitch as c_int;
+                (*slot).bitmap.buffer = if padded_len > 0 {
+                    (*ctx).last_bitmap_buffer.as_mut_ptr()
+                } else {
+                    ptr::null_mut()
+                };
                 (*slot).bitmap.num_grays = 256;
                 (*slot).bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
 
@@ -907,6 +999,20 @@ pub extern "C" fn FT_Render_Glyph(slot: *mut FT_GlyphSlotRec, _render_mode: c_ui
                 (*slot).bitmap_top = top;
                 (*slot).advance.x = (adv * 64.0) as c_long;
                 (*slot).advance.y = 0;
+                (*slot).format = FT_GLYPH_FORMAT_BITMAP;
+
+                return 0;
+            } else {
+                // Empty glyph (e.g. whitespace, control character, zero-contour outline)
+                (*ctx).last_bitmap_buffer.clear();
+                (*slot).bitmap.width = 0;
+                (*slot).bitmap.rows = 0;
+                (*slot).bitmap.pitch = 0;
+                (*slot).bitmap.buffer = ptr::null_mut();
+                (*slot).bitmap.num_grays = 256;
+                (*slot).bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+                (*slot).bitmap_left = 0;
+                (*slot).bitmap_top = 0;
                 (*slot).format = FT_GLYPH_FORMAT_BITMAP;
 
                 return 0;
@@ -938,7 +1044,7 @@ pub unsafe extern "C" fn FT_Load_Sfnt_Table(
     let tag_u32 = tag as u32;
     let tag_bytes = tag_u32.to_be_bytes();
 
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         if let Some(table) = hf.table_data(tag_bytes) {
             let table_len = table.len();
             if buffer.is_null() {
@@ -1056,7 +1162,7 @@ pub unsafe extern "C" fn FT_Get_Kerning(
     if ctx.is_null() {
         return 0;
     }
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         if let Some(kern_data) = hf.table_data(*b"kern") {
             if kern_data.len() >= 18 {
                 let n_pairs = u16::from_be_bytes([kern_data[10], kern_data[11]]) as usize;
@@ -1095,7 +1201,7 @@ pub unsafe extern "C" fn FT_Get_Advance(
     if ctx.is_null() {
         return 1;
     }
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         let upem = hf.units_per_em().max(1) as f32;
         let scale = (*ctx).pixel_size / upem;
         let adv = hf.glyph_hor_advance(gindex).unwrap_or(0) as f32 * scale;
@@ -1143,7 +1249,7 @@ pub unsafe extern "C" fn FT_Get_Postscript_Name(face: *mut FT_FaceRec) -> *const
     if ctx.is_null() {
         return (*face).family_name;
     }
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         if let Some(ps) = hf.postscript_name() {
             if let Ok(c_ps) = CString::new(ps) {
                 return c_ps.into_raw();
@@ -1167,7 +1273,7 @@ pub unsafe extern "C" fn FT_Get_Glyph_Name(
     if ctx.is_null() {
         return 1;
     }
-    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*face).face_index as u32) {
+    if let Ok(hf) = HoneyFace::from_slice(&(*ctx).font_data, (*ctx).actual_face_index) {
         if let Some(name) = hf.glyph_name(glyph_index) {
             let bytes = name.as_bytes();
             let len = bytes.len().min(buffer_max as usize - 1);
@@ -1399,6 +1505,38 @@ pub unsafe extern "C" fn FT_Outline_Translate(
         (*p).x += xOffset;
         (*p).y += yOffset;
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_EmboldenXY(
+    outline: *mut FT_Outline,
+    _xstrength: c_long,
+    _ystrength: c_long,
+) -> c_int {
+    if outline.is_null() {
+        return 1;
+    }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Embolden(
+    outline: *mut FT_Outline,
+    strength: c_long,
+) -> c_int {
+    FT_Outline_EmboldenXY(outline, strength, strength)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn FT_Outline_Get_Bitmap(
+    _library: *mut c_void,
+    outline: *mut FT_Outline,
+    abitmap: *const FT_Bitmap,
+) -> c_int {
+    if outline.is_null() || abitmap.is_null() {
+        return 1;
+    }
+    0
 }
 
 #[no_mangle]
@@ -1794,12 +1932,8 @@ pub unsafe extern "C" fn FT_Bitmap_Done(
     bitmap: *mut FT_Bitmap,
 ) -> c_int {
     if !bitmap.is_null() && !(*bitmap).buffer.is_null() {
-        let len = ((*bitmap).rows * (*bitmap).pitch.unsigned_abs() as u32) as usize;
-        if len > 0 {
-            let slice = slice::from_raw_parts_mut((*bitmap).buffer, len);
-            let _ = Box::from_raw(slice as *mut [u8]);
-            (*bitmap).buffer = ptr::null_mut();
-        }
+        free((*bitmap).buffer as *mut c_void);
+        (*bitmap).buffer = ptr::null_mut();
     }
     0
 }
@@ -1809,22 +1943,45 @@ pub unsafe extern "C" fn FT_Bitmap_Convert(
     _library: *mut c_void,
     source: *const FT_Bitmap,
     target: *mut FT_Bitmap,
-    _alignment: c_int,
+    alignment: c_int,
 ) -> c_int {
     if source.is_null() || target.is_null() {
         return 1;
     }
-    let len = ((*source).rows * (*source).pitch.unsigned_abs() as u32) as usize;
-    let mut buf = Vec::with_capacity(len);
-    buf.set_len(len);
-    if len > 0 && !(*source).buffer.is_null() {
-        ptr::copy_nonoverlapping((*source).buffer, buf.as_mut_ptr(), len);
-    }
+    let align = if alignment > 0 { alignment as usize } else { 1 };
+    let src_w = (*source).width as usize;
+    let src_h = (*source).rows as usize;
+    let target_pitch = ((src_w + align - 1) / align) * align;
+    let target_len = target_pitch * src_h;
+
+    let buffer_ptr = if target_len > 0 {
+        let ptr = calloc(target_len, 1) as *mut u8;
+        if ptr.is_null() {
+            return 1;
+        }
+        if !(*source).buffer.is_null() && src_w > 0 {
+            let src_pitch = (*source).pitch.unsigned_abs() as usize;
+            for y in 0..src_h {
+                let s_offset = y * src_pitch;
+                let d_offset = y * target_pitch;
+                let copy_w = src_w.min(src_pitch);
+                ptr::copy_nonoverlapping(
+                    (*source).buffer.add(s_offset),
+                    ptr.add(d_offset),
+                    copy_w,
+                );
+            }
+        }
+        ptr
+    } else {
+        ptr::null_mut()
+    };
+
     *target = FT_Bitmap {
         rows: (*source).rows,
         width: (*source).width,
-        pitch: (*source).pitch,
-        buffer: Box::into_raw(buf.into_boxed_slice()) as *mut u8,
+        pitch: target_pitch as c_int,
+        buffer: buffer_ptr,
         num_grays: (*source).num_grays,
         pixel_mode: (*source).pixel_mode,
         palette_mode: (*source).palette_mode,
@@ -2246,7 +2403,13 @@ mod tests {
         let mut lib: *mut c_void = ptr::null_mut();
         assert_eq!(FT_Init_FreeType(&mut lib), 0);
 
-        let font_path = if std::path::Path::new("/System/Library/Fonts/Supplemental/Arial.ttf").exists() {
+        let font_path = if std::path::Path::new("/usr/share/fonts/google-noto-vf/NotoSans[wght].ttf").exists() {
+            "/usr/share/fonts/google-noto-vf/NotoSans[wght].ttf"
+        } else if std::path::Path::new("/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf").exists() {
+            "/usr/share/fonts/adwaita-sans-fonts/AdwaitaSans-Regular.ttf"
+        } else if std::path::Path::new("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf").exists() {
+            "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"
+        } else if std::path::Path::new("/System/Library/Fonts/Supplemental/Arial.ttf").exists() {
             "/System/Library/Fonts/Supplemental/Arial.ttf"
         } else if std::path::Path::new("/Library/Fonts/Arial.ttf").exists() {
             "/Library/Fonts/Arial.ttf"
@@ -2275,6 +2438,32 @@ mod tests {
         unsafe {
             assert!((*face0).num_faces >= 1);
             assert_eq!((*face0).face_index, 0);
+
+            // Test variable font named instance (upper 16 bits set)
+            let mut face_inst: *mut FT_FaceRec = ptr::null_mut();
+            let err_inst = FT_New_Face(lib, c_path.as_ptr(), 1 << 16, &mut face_inst);
+            assert_eq!(err_inst, 0);
+            assert!(!face_inst.is_null());
+
+            // Test loading and rendering a regular character
+            let gid_a = FT_Get_Char_Index(face_inst, 'A' as c_ulong);
+            assert!(gid_a > 0);
+            assert_eq!(FT_Load_Glyph(face_inst, gid_a, FT_LOAD_DEFAULT), 0);
+            let slot_a = (*face_inst).glyph;
+            assert_eq!(FT_Render_Glyph(slot_a, 0), 0);
+            assert_eq!((*slot_a).format, FT_GLYPH_FORMAT_BITMAP);
+            assert_eq!((*slot_a).bitmap.pitch % 4, 0); // 4-byte aligned stride
+
+            // Test whitespace (empty glyph) handling
+            let gid_space = FT_Get_Char_Index(face_inst, ' ' as c_ulong);
+            assert_eq!(FT_Load_Glyph(face_inst, gid_space, FT_LOAD_DEFAULT), 0);
+            let slot_sp = (*face_inst).glyph;
+            assert_eq!(FT_Render_Glyph(slot_sp, 0), 0);
+            assert_eq!((*slot_sp).format, FT_GLYPH_FORMAT_BITMAP);
+            assert_eq!((*slot_sp).bitmap.width, 0);
+            assert_eq!((*slot_sp).bitmap.rows, 0);
+
+            assert_eq!(FT_Done_Face(face_inst), 0);
             assert_eq!(FT_Done_Face(face0), 0);
         }
 

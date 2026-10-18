@@ -9,6 +9,9 @@
 - Incorporacion de la herramienta CLI en Rust (`crates/honey-bench`) para benchmarking fotometrico y telemetria numerica de tinta.
 - Incorporacion de `crates/honey-shim` (`cdylib`): biblioteca con C ABI completa para drop-in replacement de `libfreetype.so.6`.
 - Cobertura integral de la C ABI de FreeType 2 en Rust: decodificacion de tablas OpenType (`FT_Load_Sfnt_Table`, `FT_Sfnt_Table_Info`), descomposicion de contornos vectoriales Bezier (`FT_Outline_Decompose`), gestion desacoplada de objetos glifo (`FT_Get_Glyph`, `FT_Done_Glyph`), kerning, versionado e intercepcion dinamica de Cairo (`cairo_show_glyphs`).
+- Compatibilidad integral con Gecko/Mozilla (Firefox, Zen Browser): implementacion de `FT_Outline_Embolden`, `FT_Outline_EmboldenXY` y `FT_Outline_Get_Bitmap`, resolviendo la carga dinamica de XPCOM en navegadores basados en Gecko.
+- Correccion en `FT_Bitmap_Convert` y `FT_Bitmap_Done` para asignacion, alineacion de paso (*stride*) de 4 bytes y liberacion compatible de buffers de mapas de bits.
+- Optimizacion en `installer.sh` para deteccion automatica del binario precompilado y entorno Cargo multiusuario/sudo.
 - Configuracion automatica de enlazado ELF con `SONAME libfreetype.so.6` y script de version ELF para sustitucion transparente en el cargador dinamico `ld.so`.
 - Integracion de cliente exhaustivo de pruebas en C (`examples/test_comprehensive_abi.c`) con 16 comprobaciones binarias superadas contra fuentes reales de Linux (`AdwaitaSans-Regular.ttf`).
 - Shaders de composicion fotometrica en gamma lineal ($\gamma = 1.0$) para compositores Wayland (`shaders/wayland/quad_linear_blend.frag`) compatibles con wlroots, Hyprland, Sway y KWin.
