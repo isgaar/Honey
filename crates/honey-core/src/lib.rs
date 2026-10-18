@@ -4,10 +4,12 @@
 //! low-level OS typography pipeline in Rust.
 
 pub mod dilation;
+pub mod font;
 pub mod gamma;
 pub mod rasterizer;
 
 pub use dilation::{compute_dilation_factor, compute_ink_energy, dilate_mask};
+pub use font::HoneyFace;
 pub use gamma::{blend_glyph_buffer, blend_linear, linear_to_srgb, srgb_to_linear};
 pub use rasterizer::{GlyphOutline, Point, QuartzRasterizer, RasterBitmap};
 

@@ -29,8 +29,11 @@ Honey trabaja en modo usuario: instala el comando `honey`, gestiona el perfil op
   - `honey-bench`: CLI de telemetria fotometrica y rendimiento (procesamiento > 114M ops/s).
   - `honey-shim`: biblioteca compartida (`cdylib`) que expone la C ABI para reemplazo directo de `libfreetype.so.6`.
 - `native/`:
-  - `libhoney_quartz.c` y `honey_raster_bench.c`: implementacion complementaria en C con `Makefile`.
+- `examples/`:
+  - `examples/check-rendering.sh`: script de diagnostico de fuentes.
+  - `examples/test_freetype_client.c`: cliente de prueba en C que valida la sustitucion de FreeType 2 via `libhoney_shim`.
 - `docs/`:
+  - `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md`: memoria tecnica de desarrollo en macOS y guia de transicion a Linux.
   - `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md`: plan maestro de reemplazo de FreeType a nivel de sistema.
   - `docs/QUARTZ_1_TO_1_PARITY.md`: analisis de ingenieria, telemetria empirica y paridad 1:1.
   - `docs/MATHEMATICAL_MODEL.md`: formulacion fotometrica, ecuaciones y curvas de dilatacion.
@@ -97,6 +100,7 @@ O abrelas normalmente desde tu lanzador de aplicaciones de escritorio tras ejecu
 
 ## Documentacion Tecnica
 
+- [Memoria Tecnica macOS y Transicion a Linux](docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md)
 - [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md)
 - [Paridad 1:1 con Quartz](docs/QUARTZ_1_TO_1_PARITY.md)
 - [Modelo Matematico y Fotometria](docs/MATHEMATICAL_MODEL.md)

@@ -5,10 +5,12 @@
 - Arquitectura de Paridad Quartz 1:1 basada en la investigacion empirica de macOS Sequoia (CoreGraphics, CoreText y SkyLight/Metal).
 - Eliminacion definitiva del atajo de peso forzado: se retira la promocion artificial de fuentes Regular a SemiBold (`weight: semibold`), restaurando la jerarquia y elegancia tipografica original.
 - Calibracion exacta de parametros de dilatacion optica (*stem darkening*) en FreeType (`cff:darkening-parameters` y `autofitter:darkening-parameters`) para replicar el incremento de +13.4% a +16.0% de absorcion energetica medido empiricamente en Quartz.
-- Incorporacion del motor nativo en **Rust** (`crates/honey-core`): rasterizador analitico fraccionario, dilatacion optica y composicion en gamma lineal ($\gamma = 1.0$) con rendimiento verificado de mas de 114 millones de operaciones por segundo.
+- Incorporacion del motor nativo en **Rust** (`crates/honey-core`): rasterizador analitico fraccionario, dilatacion optica, decodificador vectorial de fuentes (`ttf-parser 0.25`) y composicion en gamma lineal ($\gamma = 1.0$) con rendimiento verificado de mas de 114 millones de operaciones por segundo.
 - Incorporacion de la herramienta CLI en Rust (`crates/honey-bench`) para benchmarking fotometrico y telemetria numerica de tinta.
 - Incorporacion de `crates/honey-shim` (`cdylib`): biblioteca con C ABI para drop-in replacement de `libfreetype.so.6`.
-- Documento maestro de arquitectura: `PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md` para sustituir a FreeType directamente en el sistema operativo sin intermediarios ni parches.
+- Incorporacion de `examples/test_freetype_client.c`: cliente de validacion en C real que carga fuentes del sistema via `libhoney_shim` y renderiza glifos Quartz.
+- Documento de memoria tecnica: `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md` con la bitacora de investigacion y guia paso a paso para continuar el desarrollo en Linux.
+- Documento maestro de arquitectura: `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md` para sustituir a FreeType directamente en el sistema operativo sin intermediarios ni parches.
 - Incorporacion de documentacion tecnica profunda: `QUARTZ_1_TO_1_PARITY.md`, `MATHEMATICAL_MODEL.md` y `NATIVE_ENGINE_SPECIFICATION.md`.
 - Implementacion complementaria en C (`native/libhoney_quartz.c`).
 

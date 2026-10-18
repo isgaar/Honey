@@ -21,6 +21,7 @@ native/*.so
 native/*.dylib
 native/*.o
 native/honey_raster_bench
+examples/test_freetype_client
 target/
 Cargo.lock
 

@@ -7,3 +7,4 @@ description = "Core Quartz-parity typography and linear gamma rasterization engi
 license = "MIT"
 
 [dependencies]
+ttf-parser = "0.25"
