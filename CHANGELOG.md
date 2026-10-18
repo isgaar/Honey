@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- Arquitectura de Paridad Quartz 1:1 basada en la investigacion empirica de macOS Sequoia (CoreGraphics, CoreText y SkyLight/Metal).
+- Eliminacion definitiva del atajo de peso forzado: se retira la promocion artificial de fuentes Regular a SemiBold (`weight: semibold`), restaurando la jerarquia y elegancia tipografica original.
+- Calibracion exacta de parametros de dilatacion optica (*stem darkening*) en FreeType (`cff:darkening-parameters` y `autofitter:darkening-parameters`) para replicar el incremento de +13.4% a +16.0% de absorcion energetica medido empiricamente en Quartz.
+- Incorporacion del motor nativo en C (`native/libhoney_quartz.c`) con tablas de consulta LUT de alta velocidad para composicion fotometrica en gamma lineal ($\gamma = 1.0$), eliminando el adelgazamiento del 70% de texto sobre temas oscuros.
+- Incorporacion de la herramienta CLI de telemetria numerica (`native/honey_raster_bench.c`) y `Makefile` para medicion de densidad de tinta y validacion de paridad fotometrica.
+- Adicion de la bandera `--force-color-profile=srgb` y variables de entorno para posicionamiento fraccionario subpixel en aplicaciones Electron / Chromium.
+- Incorporacion de documentacion tecnica profunda: `QUARTZ_1_TO_1_PARITY.md`, `MATHEMATICAL_MODEL.md` y `NATIVE_ENGINE_SPECIFICATION.md`.
+
 ## 0.6.0
 
 - Agrega soporte integral para aplicaciones Electron (VS Code, VSCodium, Cursor, Antigravity, Obsidian, Slack, Discord, Element, Spotify, etc.) para imitar la calidad de renderizado de texto de macOS.

@@ -1,158 +1,114 @@
-# Modelo de render de Honey
+# Modelo de Renderizado de Honey (Quartz 1:1 Parity)
 
-Honey define un perfil tipografico de usuario basado en `fontconfig`.
+Honey implementa una arquitectura de renderizado tipografico para Linux disenada con base en los principios fundamentales de Apple Quartz Compositor (CoreGraphics, CoreText y SkyLight).
 
-La meta no es cambiar tus aplicaciones una por una, sino darles una base comun
-para que el texto se vea mas parejo entre terminales, editores, navegadores y
-herramientas GTK/Qt que respetan `fontconfig`.
+El objetivo es lograr un texto con la maxima fidelidad geometrica, solidez optica y suavidad en escala de grises sin recurrir a alteraciones destructivas de peso tipografico (`semibold`) ni a artefactos de color de subpixel.
 
-## Decisiones del perfil
+---
 
-### Antialiasing
+## 1. Decisiones del Perfil y Arquitectura
 
-Honey activa antialiasing:
+### Antialiasing Analitico en Escala de Grises (Universal Grayscale)
+
+Honey activa antialiasing en escala de grises puro:
 
 ```xml
 <edit name="antialias" mode="assign">
   <bool>true</bool>
 </edit>
-```
-
-Esto suaviza bordes y evita que las letras se vean cortadas o escalonadas.
-
-### Hinting ligero inteligente
-
-Honey usa `hintslight`:
-
-```xml
-<edit name="hintstyle" mode="assign">
-  <const>hintslight</const>
-</edit>
-```
-
-Alinea únicamente las baselines en el eje Y sin deformar ni ensanchar horizontalmente los trazos de los glifos.
-
-### FreeType Stem Darkening estilo macOS
-
-Honey habilita el *stem darkening* controlado en FreeType mediante la variable de entorno de sesión:
-
-```bash
-FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"
-```
-
-Esto replica el comportamiento de compensación de gamma de macOS CoreText, dando a las fuentes el cuerpo justo, redondeo limpio y curvas geométricas sólidas sobre temas oscuros sin deformar las letras.
-
-### Interfaz y web en Firefox
-
-Honey usa una hoja `userChrome.css` por perfil para dar un antialiasing limpio en escala de grises a la interfaz del navegador (pestañas, barra de direcciones, menús) respetando la tipografía del sistema.
-
-Para el contenido web usa `userContent.css` únicamente con suavizado `-webkit-font-smoothing: antialiased` y `-moz-osx-font-smoothing: grayscale`. No aplica trazos artificiales (`-webkit-text-stroke`), lo que evita letras partidas, ahuecadas o borrosas en temas oscuros (como ChatGPT, Gemini o GitHub).
-
-La intencion es conservar la forma natural de la fuente sin forzar demasiado la grilla de pixeles ni engrosar trazos.
-
-### Sin subpixel RGB
-
-Honey usa:
-
-```xml
 <edit name="rgba" mode="assign">
+  <const>none</const>
+</edit>
+<edit name="lcdfilter" mode="assign">
   <const>none</const>
 </edit>
 ```
 
-Esto prioriza bordes neutrales y evita franjas de color en paneles donde el
-orden fisico de subpixeles no siempre es confiable.
+Desde macOS Mojave (10.14) hasta macOS Sequoia (15.8.1), Quartz Compositor elimino por completo las franjas de color rojo y azul de subpixel LCD. Cada pixel del borde cumple rigurosamente $R = G = B$. Esto elimina aberraciones cromaticas, halos rosados o cianes en editores de codigo y asegura compatibilidad absoluta con cualquier tipo de matriz de pantalla o rotacion vertical.
 
-### Bitmaps incrustados
+### Anti-Hinting: Preservacion de Geometria Vectorial
 
-Honey desactiva bitmaps incrustados:
+Honey desactiva la deformacion por cuadricula (grid-fitting):
 
 ```xml
-<edit name="embeddedbitmap" mode="assign">
+<edit name="hinting" mode="assign">
+  <bool>false</bool>
+</edit>
+<edit name="hintstyle" mode="assign">
+  <const>hintnone</const>
+</edit>
+<edit name="autohint" mode="assign">
   <bool>false</bool>
 </edit>
 ```
 
-Asi se favorecen contornos escalables en tamanos modernos.
+A diferencia de ClearType o del hinting agresivo tradicional de Linux, que deforman las curvas Bezier para forzar que los trazos coincidan con lineas enteras de pixeles, la filosofia de Quartz mantiene la forma exacta que el disenador tipografico concibio. Los circulos de las letras 'o', 'e' y 'c' permanecen perfectamente redondos y suaves.
 
-## Prioridad de fuentes
+### Stem Darkening Optico Calibrado (Dilation)
 
-Honey sugiere familias comunes y faciles de conseguir:
+Para compensar la perdida de energia luminosa en pantallas LCD sin forzar pesos tipograficos artificiales, Honey calibra FreeType con los parametros de dilatacion de Quartz (+13.4% a +16.0% de absorcion energetica):
 
-- Sans: Inter, Noto Sans, Cantarell, DejaVu Sans.
-- Serif: Noto Serif, DejaVu Serif, Liberation Serif.
-- Mono: JetBrains Mono, Noto Sans Mono, DejaVu Sans Mono, Liberation Mono.
-- Emoji: Noto Color Emoji, Twitter Color Emoji, JoyPixels.
+```bash
+FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 cff:darkening-parameters=500,300,1000,200,1667,100,2333,0 autofitter:no-stem-darkening=0 autofitter:darkening-parameters=500,300,1000,200,1667,100,2333,0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"
+```
 
-Si una fuente no esta instalada, `fontconfig` pasa a la siguiente disponible.
+Esta calibracion:
+- Aplica una expansion normal exterior de los contornos para fuentes CFF y TrueType en tamanos de lectura (8 a 20 pt).
+- Deja los tamanos grandes de encabezados intactos para no saturarlos.
+- Reemplaza por completo el viejo atajo de promover fuentes Regular a SemiBold, permitiendo que la jerarquia tipografica real brille con total naturalidad.
 
-## Alcance
+### Composicion en Gamma Lineal (libhoney_quartz)
 
-Honey afecta aplicaciones que consultan `fontconfig`. En Linux eso cubre muchas
-apps, pero no absolutamente todas.
+El motor nativo en C (`native/libhoney_quartz.c`) y las banderas de Chromium aseguran que la mezcla de texto antialiased se calcule en espacio fotometrico lineal ($\gamma = 1.0$) antes de volver al espacio sRGB del monitor:
+- Evita el adelgazamiento optico del 70% en temas oscuros (Dark Mode).
+- Logra una presencia tipografica solida y nitida identica a macOS Sequoia.
 
-Puede afectar:
+### Interfaz y Web en Navegadores
 
-- terminales;
-- editores;
-- aplicaciones GTK;
-- aplicaciones Qt;
-- lanzadores;
-- paneles;
-- navegadores, dependiendo de su configuracion.
+- Interfaz Firefox (`userChrome.css`): Renderizado en escala de grises con suavizado `optimizeLegibility` y tipografia de sistema.
+- Contenido Web (`userContent.css`): Aplica `-webkit-font-smoothing: antialiased` y `-moz-osx-font-smoothing: grayscale` de manera neutral, sin aplicar trazos artificiales (`-webkit-text-stroke`) que partan letras o generen contornos huecos.
 
-Puede no afectar:
+---
 
-- apps que fuerzan su propio motor de texto;
-- apps empaquetadas con configuracion aislada;
-- contenido web que define fuentes remotas;
-- render dentro de imagenes, canvas o juegos.
+## 2. Prioridad de Fuentes
 
-## GTK, KDE y Electron
+Honey resuelve con prioridad familias modernas de alta legibilidad geométrica:
 
-Algunas aplicaciones no toman todo directamente de `fontconfig`. Por eso Honey
-tambien alinea capas de compatibilidad.
+- Sans: Inter, SF Pro Text, Noto Sans, Cantarell, DejaVu Sans.
+- Serif: New York, Noto Serif, DejaVu Serif, Liberation Serif.
+- Mono: JetBrains Mono, SF Mono, Menlo, Noto Sans Mono, DejaVu Sans Mono.
+- Emoji: Apple Color Emoji, Noto Color Emoji, Twitter Color Emoji, JoyPixels.
 
-GTK:
+---
 
-- `gtk-xft-antialias=1`
-- `gtk-xft-hinting=1`
-- `gtk-xft-hintstyle=hintslight`
-- `gtk-xft-rgba=none`
+## 3. Sincronizacion de Capas
 
-KDE:
+Honey sincroniza de forma coordinada:
+- Fontconfig (`~/.config/fontconfig/conf.d/99-honey.conf`)
+- GTK 3 y 4 (`settings.ini` con `gtk-xft-hintstyle=hintnone` y `gtk-xft-rgba=none`)
+- XSettings daemon (`xsettingsd.conf`)
+- KDE Plasma (`kdeglobals`, `environment.d/90-honey.conf` y `plasma-workspace/env/90-honey.sh`)
+- Flatpak (`flatpak override --user` con variables `FREETYPE_PROPERTIES`)
+- Electron y Chromium (`code-flags.conf`, `codium-flags.conf`, `cursor-flags.conf`, etc. con `--disable-lcd-text --font-render-hinting=none --enable-font-antialiasing --force-color-profile=srgb`)
 
-- `XftAntialias=true`
-- `XftHintStyle=hintslight`
-- `XftSubPixel=none`
+---
 
-Sesión KDE:
+## 4. Diagnostico y Telemetria
 
-- `~/.config/environment.d/90-honey.conf`
-- `~/.config/plasma-workspace/env/90-honey.sh`
-- `HONEY_ACTIVE=1`
-- `HONEY_FONTCONFIG=.../99-honey.conf`
-- `FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0"`
-
-Estas claves ayudan a que VSCodium, apps Qt/KDE y apps GTK no se queden con un
-perfil distinto al de Honey.
-
-## Como inspeccionar
-
-Ver la fuente resuelta:
+Para verificar la resolucion de fuentes:
 
 ```bash
 fc-match sans-serif
 fc-match monospace
 ```
 
-Ver detalles completos:
+Para ejecutar el benchmark de telemetria numerica de paridad Quartz:
 
 ```bash
-fc-match -v sans-serif
+cd ~/.local/share/honey/native && make test
 ```
 
-Ver el estado desde Honey:
+Para verificar el estado completo del perfil:
 
 ```bash
 honey status

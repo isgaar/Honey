@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 
 APP_NAME="Honey"
-APP_VERSION="0.6.0"
+APP_VERSION="0.7.0"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX="${HONEY_PREFIX:-$HOME/.local}"
 INSTALL_DIR="${HONEY_HOME:-$HOME/.local/share/honey}"
@@ -79,6 +79,7 @@ install_files() {
     copy_tree "config"
     copy_tree "docs"
     copy_tree "examples"
+    copy_tree "native"
 
     chmod +x "$INSTALL_DIR/bin/honey"
     chmod +x "$INSTALL_DIR/installer.sh"

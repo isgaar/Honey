@@ -17,4 +17,8 @@ Thumbs.db
 dist/
 build/
 .cache/
+native/*.so
+native/*.dylib
+native/*.o
+native/honey_raster_bench
 

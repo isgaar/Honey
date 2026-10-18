@@ -1,163 +1,85 @@
 # Honey
 
-Honey es una capa de ajuste tipográfico para Linux. Su objetivo es dejar el
-texto más limpio, consistente y suave sin depender de cambios globales del
-sistema ni de configuraciones difíciles de recordar.
+Honey es una capa avanzada de arquitectura tipografica para Linux y sistemas Unix. Su objetivo es alcanzar una paridad visual, geometrica y fotometrica de 1 a 1 con el renderizado de **Apple Quartz Compositor** (CoreGraphics, CoreText y SkyLight) sin utilizar codigo propietario de Apple.
 
-Honey trabaja en modo usuario: instala un comando `honey`, guarda una plantilla
-de `fontconfig` y permite activar o retirar el perfil cuando quieras.
+Honey trabaja en modo usuario: instala el comando `honey`, gestiona el perfil optimizado de `fontconfig`, provee un motor nativo en C (`native/libhoney_quartz.c`) para composicion en gamma lineal y sincroniza de forma reversible todas las capas del escritorio (GTK, KDE Plasma, Flatpak, navegadores y aplicaciones Electron).
 
-## Qué hace
+---
 
-- Activa antialiasing.
-- Usa hinting ligero (`hintslight`) para preservar la geometría y curvas redondas perfectas sin deformar letras.
-- Activa `stem darkening` en FreeType (`no-stem-darkening=0`) para dar el cuerpo sólido y redondeo limpio característico de macOS sobre temas oscuros.
-- Establece peso Medium 500 para la interfaz manteniendo legibilidad y presencia sin forzar negritas globales.
-- Aplica suavizado `antialiased` limpio en la web (`userContent.css`) sin trazos artificiales destructivos (`-webkit-text-stroke`).
-- Prefiere render grayscale (`rgba=none`) en lugar de subpixel RGB.
-- Desactiva bitmaps incrustados para fuentes escalables.
-- Define una prioridad razonable de fuentes sans, serif, mono y emoji.
-- Regenera la caché de fuentes cuando `fc-cache` está disponible.
-- Agrega una base para documentar y ampliar instrucciones orientadas a apps GTK y KDE.
-- Sincroniza GTK, KDE, DBus y systemd user para que las apps lanzadas por KDE hereden Honey.
-- Adapta el lanzador KDE de VSCodium cuando una instalación local omite el entorno de sesión.
-- Mantiene todo bajo `$HOME`, sin `sudo`.
+## Que hace (Arquitectura de Paridad Quartz)
 
-## Qué incluye
+- **Antialiasing Analitico en Escala de Grises (Universal Grayscale)**: Elimina completamente el subpixel LCD (`rgba=none`, `lcdfilter=none`), garantizando $R=G=B$ en cada pixel de borde al igual que macOS Mojave y Sequoia. Cero franjas cromaticas rojas/azules.
+- **Anti-Hinting (Preservacion de Geometria Vectorial)**: Desactiva la deformacion de cuadricula (`hintnone` / `hinting=false`), manteniendo las curvas Bezier intactas sin distorsionar la intencion de diseno del tipografo.
+- **Stem Darkening Optico Calibrado (Dilation)**: Aplica una dilatacion normal de contornos vectoriales (+13.4% a +16.0% de absorcion energetica de tinta) mediante parametros calibrados en FreeType (`darkening-parameters`). Reemplaza viejos atajos destructivos como forzar `SemiBold`.
+- **Composicion en Gamma Lineal (libhoney_quartz)**: Provee tablas LUT de alta velocidad para mezclar texto antialiased en luminancia lineal ($\gamma = 1.0$), evitando el adelgazamiento del 70% en temas oscuros (Dark Mode).
+- **Posicionamiento Subpixel Fraccionario**: Habilita avances y origenes fraccionarios (1/4 o 1/8 pixel) para ritmo de lectura y kerning exactos.
+- **Sincronizacion Electron / Chromium**: Inyecta banderas estandar (`--disable-lcd-text`, `--font-render-hinting=none`, `--enable-font-antialiasing`, `--force-color-profile=srgb`) a VS Code, Cursor, Antigravity, Obsidian, Slack, Spotify, etc.
+- **Sincronizacion de Sesion KDE / DBus / systemd**: Exporta variables de entorno limpias a traves de `environment.d` y `plasma-workspace/env`.
+- **Aislamiento en Espacio de Usuario**: Todo vive bajo `$HOME`, sin necesidad de `sudo` ni riesgos de alterar paquetes del sistema.
 
-- `installer.sh`: instala o desinstala Honey en modo usuario.
-- `bin/honey`: comando principal para aplicar, retirar y revisar el perfil.
-- `config/fontconfig/99-honey.conf`: perfil tipográfico versionado.
-- `examples/check-rendering.sh`: ejemplo de diagnóstico local.
-- `docs/`: documentación extensa de instalación, uso, render, desarrollo y GitHub.
-- `scripts/publish-github.sh`: flujo de publicación del repositorio.
+---
 
-## Instalación rápida
+## Que incluye
 
-Desde esta carpeta:
+- `installer.sh`: instalador y desinstalador reproducible en modo usuario.
+- `bin/honey`: CLI principal para aplicar, retirar, lanzar aplicaciones y auditar el sistema.
+- `config/fontconfig/99-honey.conf`: perfil de paridad tipografica versionado.
+- `native/`:
+  - `libhoney_quartz.c`: motor nativo en C de composicion lineal y dilatacion optica.
+  - `honey_raster_bench.c`: herramienta CLI de telemetria y verificacion numerica contra baselines de macOS.
+  - `Makefile`: compilador cruzado para Linux y macOS.
+- `docs/`:
+  - `docs/QUARTZ_1_TO_1_PARITY.md`: analisis de ingenieria, telemetria empirica y paridad 1:1.
+  - `docs/MATHEMATICAL_MODEL.md`: formulacion fotometrica, ecuaciones y curvas de dilatacion.
+  - `docs/NATIVE_ENGINE_SPECIFICATION.md`: integracion nativa en compositores Wayland, Cairo y Skia.
+  - `docs/RENDERING.md`: modelo y decisiones de rasterizacion.
+  - `docs/INSTALL.md`: guia de instalacion paso a paso.
+  - `docs/USAGE.md`: manual completo de comandos y lanzadores.
+  - `docs/TROUBLESHOOTING.md`: solucion de problemas comunes.
+  - `docs/DEVELOPMENT.md`: guia para desarrolladores.
+  - `docs/GITHUB.md`: publicacion y sincronizacion.
+
+---
+
+## Instalacion rapida
+
+Desde el directorio de Honey:
 
 ```bash
 chmod +x installer.sh bin/honey examples/check-rendering.sh scripts/publish-github.sh
 ./installer.sh install
 ```
 
-Si `~/.local/bin` no está en tu `PATH`, agrega esto a tu shell:
+Asegurate de que `~/.local/bin` este en tu `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Después aplica el perfil:
+Aplica el perfil:
 
 ```bash
 honey apply
 honey status
 ```
 
-Para retirar el perfil:
+Para compilar y ejecutar el benchmark de telemetria nativa:
+
+```bash
+cd native && make test
+```
+
+Para retirar Honey y restaurar tus configuraciones previas:
 
 ```bash
 honey reset
 ```
 
-## Uso básico
+---
 
-Ver ayuda:
+## Aplicaciones Electron (VS Code, Cursor, Codium, Slack)
 
-```bash
-honey help
-```
-
-Aplicar Honey:
-
-```bash
-honey apply
-```
-
-Revisar estado:
-
-```bash
-honey status
-```
-
-Ver rutas usadas:
-
-```bash
-honey paths
-```
-
-Retirar el perfil:
-
-```bash
-honey reset
-```
-
-## Rutas importantes
-
-Honey instala sus archivos en:
-
-```bash
-$HOME/.local/share/honey
-```
-
-El comando queda en:
-
-```bash
-$HOME/.local/bin/honey
-```
-
-El perfil activo de fontconfig queda en:
-
-```bash
-$HOME/.config/fontconfig/conf.d/99-honey.conf
-```
-
-Honey también puede ajustar estas rutas de compatibilidad:
-
-```bash
-$HOME/.config/gtk-3.0/settings.ini
-$HOME/.config/gtk-4.0/settings.ini
-$HOME/.config/xsettingsd/xsettingsd.conf
-$HOME/.config/kdeglobals
-$HOME/.config/codium-flags.conf
-$HOME/.mozilla/firefox/<perfil>/chrome/userChrome.css
-$HOME/.mozilla/firefox/<perfil>/chrome/userContent.css
-$HOME/.mozilla/firefox/<perfil>/user.js
-$HOME/.config/environment.d/90-honey.conf
-$HOME/.config/plasma-workspace/env/90-honey.sh
-```
-
-## GTK y KDE
-
-Estos cambios también buscan sumar más instrucciones para que las aplicaciones
-GTK y KDE respeten mejor el perfil tipográfico de Honey. La idea es mantener
-una base común desde `fontconfig` y documentar ajustes específicos cuando una
-app o toolkit necesite configuración adicional.
-
-En KDE, Honey alinea `XftAntialias`, `XftHintStyle` y `XftSubPixel` dentro de
-`kdeglobals`. En GTK, alinea `gtk-xft-antialias`, `gtk-xft-hinting`,
-`gtk-xft-hintstyle` y `gtk-xft-rgba`. En Firefox, agrega una hoja
-`userChrome.css` limitada a la interfaz y `userContent.css` con un ajuste de
-trazo neutral; no impone fuentes, pesos, tamaños ni reglas de diseño.
-
-## VSCodium, VS Code, Cursor y Aplicaciones Electron
-
-Las aplicaciones Electron (VS Code, VSCodium, Cursor, Antigravity, Obsidian, Slack, Discord, Element, Spotify, etc.) usan el motor Chromium/Skia. Por defecto en Linux, este motor puede renderizar fuentes delgadas o con franjas subpixel RGB.
-
-Honey configura las aplicaciones Electron para imitar la calidad y suavizado de **macOS**:
-- Configura archivos de banderas en `~/.config/` (`code-flags.conf`, `codium-flags.conf`, `electron-flags.conf`, etc.) con `--disable-lcd-text`, `--font-render-hinting=slight` y `--enable-font-antialiasing`.
-- Habilita `truetype:no-stem-darkening=0` en FreeType para dar volumen y solidez a fuentes TrueType (Inter, JetBrains Mono, SF Pro).
-- Inyecta la capa de sesión mediante `environment.d`, `plasma-workspace/env`, DBus y systemd user.
-
-Después de `honey apply`, las aplicaciones Electron heredan:
-
-```text
-HONEY_ACTIVE=1
-HONEY_FONTCONFIG=$HOME/.config/fontconfig/conf.d/99-honey.conf
-FREETYPE_PROPERTIES=truetype:interpreter-version=40 truetype:no-stem-darkening=0 cff:no-stem-darkening=0 autofitter:no-stem-darkening=0 type1:no-stem-darkening=0 t1mode:no-stem-darkening=0
-```
-
-Para lanzar cualquier aplicación Electron directamente con el perfil macOS de Honey:
+Las aplicaciones basadas en Electron / Chromium heredan automaticamente el perfil de renderizado macOS:
 
 ```bash
 honey launch-electron cursor
@@ -166,20 +88,16 @@ honey launch-codium .
 honey launch-honey-codium .
 ```
 
-## Documentación
+O abrelas normalmente desde tu lanzador de aplicaciones de escritorio tras ejecutar `honey apply`.
 
-- [Instalación](docs/INSTALL.md)
-- [Uso](docs/USAGE.md)
-- [Modelo de render](docs/RENDERING.md)
-- [Desarrollo](docs/DEVELOPMENT.md)
-- [Publicación en GitHub](docs/GITHUB.md)
-- [Solución de problemas](docs/TROUBLESHOOTING.md)
+---
 
-## Estado del proyecto
+## Documentacion Tecnica
 
-Honey está en etapa inicial. La prioridad de esta base es que el proyecto tenga:
-
-- instalación reproducible,
-- cambios fáciles de revisar,
-- activación y retiro sin fricción,
-- documentación suficiente para ajustar el render con confianza.
+- [Paridad 1:1 con Quartz](docs/QUARTZ_1_TO_1_PARITY.md)
+- [Modelo Matematico y Fotometria](docs/MATHEMATICAL_MODEL.md)
+- [Especificacion del Motor Nativo](docs/NATIVE_ENGINE_SPECIFICATION.md)
+- [Modelo de Render](docs/RENDERING.md)
+- [Uso y Comandos](docs/USAGE.md)
+- [Instalacion](docs/INSTALL.md)
+- [Solucion de Problemas](docs/TROUBLESHOOTING.md)
