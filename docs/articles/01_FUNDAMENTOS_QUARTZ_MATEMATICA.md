@@ -8,7 +8,7 @@
 
 ## Resumen
 
-El renderizado de fuentes en Apple Quartz Compositor difiere radicalmente de los modelos tradicionales implementados en Microsoft ClearType y GNU/Linux FreeType. Mientras estos ultimos priorizan la alineacion rigida a la cuadricula de pixeles discretos (*grid-fitting* o *hinting*), Quartz implementa un modelo de fidelidad de contorno continuo basado en integrales de area analitica, dilatacion optica vectorial (*stem darkening*) y composicion fotometrica en espacio de color lineal ($\gamma = 1.0$). Este articulo formaliza las bases fisicas, geometricas y matematicas de Quartz, sustentadas en mediciones empiricas en memoria sobre macOS Sequoia 15.8.1 (Darwin 24.6.0) y su transposicion al motor en Rust [honey-core](file:///Users/ismael/Documents/Honey/crates/honey-core).
+El renderizado de fuentes en Apple Quartz Compositor difiere radicalmente de los modelos tradicionales implementados en Microsoft ClearType y GNU/Linux FreeType. Mientras estos ultimos priorizan la alineacion rigida a la cuadricula de pixeles discretos (*grid-fitting* o *hinting*), Quartz implementa un modelo de fidelidad de contorno continuo basado en integrales de area analitica, dilatacion optica vectorial (*stem darkening*) y composicion fotometrica en espacio de color lineal ($\gamma = 1.0$). Este articulo formaliza las bases fisicas, geometricas y matematicas de Quartz, sustentadas en mediciones empiricas en memoria sobre macOS Sequoia 15.8.1 (Darwin 24.6.0) y su transposicion al motor en Rust [honey-core](../../crates/honey-core).
 
 ---
 
@@ -41,7 +41,7 @@ La primera regla de Quartz establece que **los vectores nunca deben deformarse**
 $$\alpha(x, y) = \iint_{C_{x, y}} \text{Wind}(u, v) \, du \, dv$$
 
 Donde $\text{Wind}(u, v)$ es el numero de enrollamiento (*winding number*) del contorno en el punto $(u, v)$.
-En [crates/honey-core/src/rasterizer.rs](file:///Users/ismael/Documents/Honey/crates/honey-core/src/rasterizer.rs), este calculo se implementa mediante muestreo analitico multicanal de 8 sub-muestras por scanline con precision de coma flotante de 1/64 de pixel:
+En [crates/honey-core/src/rasterizer.rs](../../crates/honey-core/src/rasterizer.rs), este calculo se implementa mediante muestreo analitico multicanal de 8 sub-muestras por scanline con precision de coma flotante de 1/64 de pixel:
 
 ```rust
 // Muestreo analitico subpixel en honey-core
@@ -75,7 +75,7 @@ $$D(\text{pt}) = \begin{cases}
 0.0 & \text{si } \text{pt} > 48.0 
 \end{cases}$$
 
-Implementada en [crates/honey-core/src/dilation.rs](file:///Users/ismael/Documents/Honey/crates/honey-core/src/dilation.rs): a tamanos pequenos de lectura (8-14pt), la dilatacion refuerza la masa de tinta hasta en un **+16.06%**, mientras que a tamanos de rotulo (>48pt) se atenua suavemente a cero para preservar la finura del diseno.
+Implementada en [crates/honey-core/src/dilation.rs](../../crates/honey-core/src/dilation.rs): a tamanos pequenos de lectura (8-14pt), la dilatacion refuerza la masa de tinta hasta en un **+16.06%**, mientras que a tamanos de rotulo (>48pt) se atenua suavemente a cero para preservar la finura del diseno.
 
 ---
 
@@ -98,7 +98,7 @@ $$f(\alpha x + (1-\alpha)y) < \alpha f(x) + (1-\alpha) f(y)$$
 **Consecuencia fisica:** En fondos oscuros con texto blanco, el borde semitransparente pierde mas del 70% de la energia luminica esperada, produciendo un reborde sucio y un adelgazamiento destructivo del texto.
 
 ### 4.3 La Solucion Fotometrica de Honey Core
-Honey ejecuta la mezcla estricta en espacio lineal implementada en [crates/honey-core/src/gamma.rs](file:///Users/ismael/Documents/Honey/crates/honey-core/src/gamma.rs):
+Honey ejecuta la mezcla estricta en espacio lineal implementada en [crates/honey-core/src/gamma.rs](../../crates/honey-core/src/gamma.rs):
 
 $$C_{\text{linear}} = \text{LUT}_{\text{to\_linear}}[C_{\text{sRGB}}]$$
 $$B_{\text{linear}} = C_{\text{linear\_text}} \cdot \alpha + C_{\text{linear\_bg}} \cdot (1 - \alpha)$$

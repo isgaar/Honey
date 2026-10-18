@@ -76,7 +76,7 @@ En GNU/Linux y Wayland, el equivalente abierto a esta arquitectura es el protoco
 +---------------------------------------------------------------------------------------+
 ```
 
-Al sustituir `libfreetype.so.6` con [crates/honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim), el proceso GPU de Chromium y Electron en Linux adopta de forma transparente la rasterizacion y dilatacion de Quartz, cerrando la brecha visual con macOS.
+Al sustituir `libfreetype.so.6` con [crates/honey-shim](../../crates/honey-shim), el proceso GPU de Chromium y Electron en Linux adopta de forma transparente la rasterizacion y dilatacion de Quartz, cerrando la brecha visual con macOS.
 
 ---
 

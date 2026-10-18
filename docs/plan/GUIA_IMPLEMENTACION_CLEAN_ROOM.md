@@ -17,7 +17,7 @@ La jurisprudencia internacional sobre derechos de autor y propiedad intelectual 
 2. **Equipo de Implementacion (Clean Room):**
    - Desarrolladores que trabajan unicamente a partir de las especificaciones funcionales publicadas en este repositorio.
    - Nunca han tenido acceso a codigo fuente confidencial o descompilado protegido de Apple.
-   - Escriben una implementacion original y limpia en **Rust** ([crates/honey-core](file:///Users/ismael/Documents/Honey/crates/honey-core) y [crates/honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim)).
+   - Escriben una implementacion original y limpia en **Rust** ([crates/honey-core](../../crates/honey-core) y [crates/honey-shim](../../crates/honey-shim)).
 
 ---
 

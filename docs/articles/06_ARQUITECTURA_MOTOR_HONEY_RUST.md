@@ -8,7 +8,7 @@
 
 ## Resumen
 
-Este articulo detalla la arquitectura de software, las decisiones de diseno y el rendimiento de **Honey**, un motor tipografico de bajo nivel escrito en **Rust puro** concebido para reemplazar la biblioteca compartida `libfreetype.so.6` en sistemas operativos GNU/Linux. Se describe la separacion modular entre el nucleo matematico ([honey-core](file:///Users/ismael/Documents/Honey/crates/honey-core)), la capa de enlace C ABI ([honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim)) y las herramientas de telemetria ([honey-bench](file:///Users/ismael/Documents/Honey/crates/honey-bench)), documentando las optimizaciones de memoria (zero allocation en bucles calientes) y validando benchmarks que superan 114 millones de operaciones de mezcla por segundo en un unico hilo de CPU.
+Este articulo detalla la arquitectura de software, las decisiones de diseno y el rendimiento de **Honey**, un motor tipografico de bajo nivel escrito en **Rust puro** concebido para reemplazar la biblioteca compartida `libfreetype.so.6` en sistemas operativos GNU/Linux. Se describe la separacion modular entre el nucleo matematico ([honey-core](../../crates/honey-core)), la capa de enlace C ABI ([honey-shim](../../crates/honey-shim)) y las herramientas de telemetria ([honey-bench](../../crates/honey-bench)), documentando las optimizaciones de memoria (zero allocation en bucles calientes) y validando benchmarks que superan 114 millones de operaciones de mezcla por segundo en un unico hilo de CPU.
 
 ---
 
@@ -31,7 +31,7 @@ Honey/
 
 ## 2. Diseno de `honey-core`: El Motor Matematico
 
-El crate [crates/honey-core](file:///Users/ismael/Documents/Honey/crates/honey-core) contiene cuatro modulos ortogonales:
+El crate [crates/honey-core](../../crates/honey-core) contiene cuatro modulos ortogonales:
 
 ```
 crates/honey-core/src/
@@ -47,7 +47,7 @@ Para lograr rendimiento en tiempo real sin calcular costosas funciones potencial
 - `SRGB_TO_LINEAR_LUT`: 256 entradas de `f32` para decodificar valores de 8 bits a luminancia lineal.
 - `LINEAR_TO_SRGB_LUT`: 4096 entradas de `u8` para codificar luminancia lineal de vuelta a sRGB con precision de 12 bits.
 
-La funcion [blend_linear](file:///Users/ismael/Documents/Honey/crates/honey-core/src/gamma.rs#L60-L75) ejecuta la mezcla fotometrica con cero llamadas al sistema y cero asignaciones de heap:
+La funcion [blend_linear](../../crates/honey-core/src/gamma.rs#L60-L75) ejecuta la mezcla fotometrica con cero llamadas al sistema y cero asignaciones de heap:
 
 ```rust
 #[inline]
@@ -62,13 +62,13 @@ pub fn blend_linear(text_srgb: u8, bg_srgb: u8, alpha_u8: u8) -> u8 {
 ```
 
 ### 2.2 `dilation.rs`: Dilatacion Isotropica sin Distorsion de Metricas
-La funcion [dilate_mask](file:///Users/ismael/Documents/Honey/crates/honey-core/src/dilation.rs#L28-L50) aplica un kernel de vecindad de 8 direcciones sobre la matriz de cobertura. No modifica las dimensiones de la imagen ni desplaza las metricas de posicionamiento horizontal:
+La funcion [dilate_mask](../../crates/honey-core/src/dilation.rs#L28-L50) aplica un kernel de vecindad de 8 direcciones sobre la matriz de cobertura. No modifica las dimensiones de la imagen ni desplaza las metricas de posicionamiento horizontal:
 - Peso central: $1.0\times$.
 - Vecinos cardinales (4-conectados): $\text{factor} \times 0.35$.
 - Vecinos diagonales: $\text{factor} \times 0.15$.
 
 ### 2.3 `rasterizer.rs`: Muestreo de Area Subpixel Fraccionario
-Implementa [QuartzRasterizer](file:///Users/ismael/Documents/Honey/crates/honey-core/src/rasterizer.rs#L89-L314):
+Implementa [QuartzRasterizer](../../crates/honey-core/src/rasterizer.rs#L89-L314):
 - Descompone curvas cuadraticas y cubicas de Bezier en pequenas lineas rectas mediante subdivision analitica adaptativa.
 - Muestrea 8 sub-scanlines por fila fisica de pixel con desfase fraccionario subpixel.
 - Calcula el *winding number* continuo para soportar contornos con relleno par-impar (*Even-Odd*) o no-cero (*Non-Zero Winding*).
@@ -77,7 +77,7 @@ Implementa [QuartzRasterizer](file:///Users/ismael/Documents/Honey/crates/honey-
 
 ## 3. Diseno de `honey-shim`: La Capa de Reemplazo C ABI
 
-El crate [crates/honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim) compila como biblioteca dinamica C (`crate-type = ["cdylib"]`), emitiendo `libhoney_shim.so` (en Linux) o `libhoney_shim.dylib` (en macOS).
+El crate [crates/honey-shim](../../crates/honey-shim) compila como biblioteca dinamica C (`crate-type = ["cdylib"]`), emitiendo `libhoney_shim.so` (en Linux) o `libhoney_shim.dylib` (en macOS).
 
 ### 3.1 Compatibilidad Binaria con FreeType 2.13.2
 Para que el cargador dinamico de Linux (`ld.so`) acepte a Honey como sustituto sin emitir errores de simbolos no resueltos, `honey-shim` exporta la totalidad de las funciones requeridas por GTK, Qt, Chromium, Skia, Firefox y Cairo:
@@ -112,7 +112,7 @@ Si el stream tiene un bufer en memoria (`base != null`), Honey lee directamente 
 
 ## 4. Telemetria de Rendimiento y Benchmarks
 
-Mediciones ejecutadas en el arnes de pruebas [crates/honey-bench](file:///Users/ismael/Documents/Honey/crates/honey-bench) sobre procesador AMD Ryzen 5:
+Mediciones ejecutadas en el arnes de pruebas [crates/honey-bench](../../crates/honey-bench) sobre procesador AMD Ryzen 5:
 
 ```text
 ======================================================================

@@ -7,7 +7,7 @@ Este documento define la estrategia tecnica, arquitectonica y de despliegue para
 ## 1. Declaracion de Objetivos del Proyecto Honey
 
 ### 1.1 Objetivo Primario
-Reemplazar binariamente la biblioteca estandar `libfreetype.so.6` en el sistema operativo GNU/Linux mediante un motor desarrollado en **Rust puro** ([crates/honey-core](file:///Users/ismael/Documents/Honey/crates/honey-core) y [crates/honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim)), proporcionando paridad funcional y visual del 100% con **Apple Quartz Compositor** (CoreGraphics, CoreText y WindowServer/SkyLight):
+Reemplazar binariamente la biblioteca estandar `libfreetype.so.6` en el sistema operativo GNU/Linux mediante un motor desarrollado en **Rust puro** ([crates/honey-core](../../crates/honey-core) y [crates/honey-shim](../../crates/honey-shim)), proporcionando paridad funcional y visual del 100% con **Apple Quartz Compositor** (CoreGraphics, CoreText y WindowServer/SkyLight):
 1. **Fidelidad geometrica continua** sin grid-fitting destructivo (*anti-hinting*).
 2. **Posicionamiento fraccionario subpixel** en punto flotante (`1/64 px`).
 3. **Dilatacion optica de trazo** (*stem darkening*) calibrada segun tamano y densidad.
@@ -73,14 +73,14 @@ En GNU/Linux, cualquier aplicacion grafica enlaza dinamicamente contra la biblio
 ```
 
 ### Mecanismo de sustitucion:
-[crates/honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim) se compila como una biblioteca compartida dinamica (`cdylib`):
+[crates/honey-shim](../../crates/honey-shim) se compila como una biblioteca compartida dinamica (`cdylib`):
 - Archivo generado: `target/release/libhoney_shim.so`.
 - Nombre de enlace de sistema: `libfreetype.so.6.20.1` con enlace simbolico `libfreetype.so.6`.
 - Intercepta las llamadas criticas:
   - `FT_Init_FreeType`: Inicializa las estructuras globales y tablas LUT del motor Rust.
   - `FT_Open_Face` / `FT_New_Face` / `FT_New_Memory_Face`: Carga fuentes desde disco, memoria o flujos de red (`FT_OPEN_STREAM` para fuentes web en Gecko/Firefox/Zen).
   - `FT_Load_Glyph`: Decodifica el contorno vectorial del tipo de letra preservando las coordenadas de diseno en punto flotante.
-  - `FT_Render_Glyph`: Invoca a [render_glyph](file:///Users/ismael/Documents/Honey/crates/honey-core/src/font.rs#L232-L325) de Honey Core, ejecutando rasterizacion analitica fraccionaria y dilatacion optica.
+  - `FT_Render_Glyph`: Invoca a [render_glyph](../../crates/honey-core/src/font.rs#L232-L325) de Honey Core, ejecutando rasterizacion analitica fraccionaria y dilatacion optica.
   - `FT_Outline_Decompose`: Pasa segmentos vectoriales limpios sin snapping para generadores de campos de distancia (SDF en QtQuick / KDE).
 
 ---

@@ -32,7 +32,7 @@ Este documento define la planificacion temporal, los hitos de verificacion y el 
 ### Hito M2: Sustitucion de la C ABI (`honey-shim`)
 - **Entregables:**
   - Exportacion de simbolos C estandar: `FT_Init_FreeType`, `FT_Done_FreeType`, `FT_New_Face`, `FT_Done_Face`, `FT_Load_Glyph`, `FT_Render_Glyph`, `FT_Get_Char_Index`, `FT_Get_Glyph`, `FT_Done_Glyph`, `FT_Glyph_To_Bitmap`.
-  - Suite de validacion C: [examples/test_comprehensive_abi.c](file:///Users/ismael/Documents/Honey/examples/test_comprehensive_abi.c).
+  - Suite de validacion C: [examples/test_comprehensive_abi.c](../../examples/test_comprehensive_abi.c).
 - **Criterio de Aceptacion:** 16/16 pruebas de ABI superadas con exito con fuentes reales de Linux (Adwaita Sans, Noto Sans).
 
 ### Hito M3: Soporte de Web Fonts en Motores de Navegacion
@@ -51,7 +51,7 @@ Este documento define la planificacion temporal, los hitos de verificacion y el 
 - **Entregables:**
   - Actualizacion de `bin/honey` con ejecucion automatica de `restorecon -F` y `chcon -t lib_t`.
   - Smoke tests con `fc-match` y `fc-list` con proteccion de rollback inmediato.
-  - Especificacion RPM actualizada para Fedora/RHEL ([packages/fedora/honey-freetype.spec](file:///Users/ismael/Documents/Honey/packages/fedora/honey-freetype.spec)).
+  - Especificacion RPM actualizada para Fedora/RHEL ([packages/fedora/honey-freetype.spec](../../packages/fedora/honey-freetype.spec)).
 - **Criterio de Aceptacion:** Instalacion en Fedora con SELinux en modo Enforcing sin pantallas negras en GDM/SDDM.
 
 ### Hito M6: Perfiles de Escritorio GNOME y KDE Plasma (Hito Actual)

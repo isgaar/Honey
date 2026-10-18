@@ -16,7 +16,7 @@ El archivo de biblioteca `/usr/local/lib64/libhoney_shim.so` no tenia la etiquet
 2. Iniciar sesion con tu usuario y contrasena.
 3. Ejecutar el comando de restauracion de Honey:
    ```bash
-   sudo /home/ismael/Proyectos/Honey/bin/honey restore-system
+   sudo ./bin/honey restore-system
    ```
 4. Si el script no estuviera disponible, restaurar manualmente el cargador dinamico:
    ```bash
@@ -40,7 +40,7 @@ En WhatsApp Web, Slack o sitios con fuentes descargadas `@font-face`, los textos
 Los navegadores basados en Gecko (Firefox y Zen Browser) empaquetan las fuentes web en memoria y llaman a `FT_Open_Face` con el flag `FT_OPEN_STREAM` (0x2).
 
 ### Verificacion:
-1. Asegurate de tener una compilacion reciente de [crates/honey-shim](file:///Users/ismael/Documents/Honey/crates/honey-shim) posterior al commit `b277d1e`.
+1. Asegurate de tener una compilacion reciente de [crates/honey-shim](../../crates/honey-shim) posterior al commit `b277d1e`.
 2. Verifica que el proceso del navegador tiene mapeada la biblioteca correcta:
    ```bash
    pmap $(pgrep -f "zen" | head -n 1) | grep libhoney
@@ -48,7 +48,7 @@ Los navegadores basados en Gecko (Firefox y Zen Browser) empaquetan las fuentes 
 3. Si el navegador ya estaba abierto antes de lanzar el comando con `LD_PRELOAD`, este se conectara a la instancia en segundo plano sin precargar la biblioteca. Mata siempre los procesos huerfanos antes de probar:
    ```bash
    killall -9 zen zen-bin firefox 2>/dev/null || true
-   LD_PRELOAD=/home/ismael/Proyectos/Honey/target/release/libhoney_shim.so zen-browser &
+   LD_PRELOAD=$PWD/target/release/libhoney_shim.so zen-browser &
    ```
 
 ---
@@ -62,7 +62,7 @@ Caracteres con astas descendentes (`'y'`, `'g'`, `'p'`, `'q'`) aparecen caidos o
 El motor Skia calcula el rectangulo del glifo mediante `FT_Outline_Get_CBox` antes de llamar a `FT_Render_Glyph`. Si el rasterizador anade relleno artificial (`pad = 1`), Skia desalinea la celda del atlas.
 
 ### Verificacion:
-Ejecuta la suite de paridad de caja delimitadora en [examples/test_comprehensive_abi.c](file:///Users/ismael/Documents/Honey/examples/test_comprehensive_abi.c):
+Ejecuta la suite de paridad de caja delimitadora en [examples/test_comprehensive_abi.c](../../examples/test_comprehensive_abi.c):
 ```bash
 ./bin/honey test
 ```

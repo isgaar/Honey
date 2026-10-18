@@ -88,7 +88,7 @@ honey profile set kde
 
 ### 4.1 Perfil GNOME (`honey profile set gnome`)
 1. **Compensacion Optica de Supersampling:** Incremento de la dilatacion optica en un factor de $1.15\times$ en tamanos de lectura (10 a 14 pt) para compensar el filtrado bilineal de Mutter.
-2. **Alineacion de Stride de 4 Bytes:** Garantia estricta de `pitch = (width + 3) & !3` en [FT_Render_Glyph](file:///Users/ismael/Documents/Honey/crates/honey-shim/src/lib.rs#L964-L1010) para Cairo y GSK.
+2. **Alineacion de Stride de 4 Bytes:** Garantia estricta de `pitch = (width + 3) & !3` en [FT_Render_Glyph](../../crates/honey-shim/src/lib.rs#L964-L1010) para Cairo y GSK.
 3. **Optimizacion para Adwaita Sans y Cantarell:** Desactivacion de autohinting destructivo (`hintstyle = hintnone`) y escala de grises de 8 bits sin franjas cromaticas.
 
 ### 4.2 Perfil KDE Plasma (`honey profile set kde`)

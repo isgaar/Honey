@@ -58,16 +58,16 @@ LD_PRELOAD=$(pwd)/target/release/libhoney_shim.so nautilus --new-window &
 
 ## 3. Empaquetado Nativo para Distribuciones
 
-El directorio [packages/](file:///Users/ismael/Documents/Honey/packages) contiene los manifiestos de empaquetado formal:
+El directorio [packages/](../../packages) contiene los manifiestos de empaquetado formal:
 
 ### 3.1 Fedora / RHEL (RPM)
-Manifiesto disponible en [packages/fedora/honey-freetype.spec](file:///Users/ismael/Documents/Honey/packages/fedora/honey-freetype.spec).
+Manifiesto disponible en [packages/fedora/honey-freetype.spec](../../packages/fedora/honey-freetype.spec).
 ```bash
 rpmbuild -ba packages/fedora/honey-freetype.spec
 ```
 
 ### 3.2 Arch Linux (PKGBUILD)
-Manifiesto disponible en [packages/arch/PKGBUILD](file:///Users/ismael/Documents/Honey/packages/arch/PKGBUILD).
+Manifiesto disponible en [packages/arch/PKGBUILD](../../packages/arch/PKGBUILD).
 ```bash
 cd packages/arch && makepkg -si
 ```

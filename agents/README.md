@@ -27,9 +27,9 @@ El desarrollo de Honey se ejecuta mediante un modelo de dos nodos especializados
 
 ## 2. Indice de Protocolos para Agentes
 
-1. **[ORDEN_DOCUMENTACION_Y_MEMORIA.md](file:///Users/ismael/Documents/Honey/docs/agents/ORDEN_DOCUMENTACION_Y_MEMORIA.md)**:
+1. **[ORDEN_DOCUMENTACION_Y_MEMORIA.md](../docs/agents/ORDEN_DOCUMENTACION_Y_MEMORIA.md)**:
    Reglas inmutables para la redaccion de documentacion tecnica, convenciones obligatorias de commits, preservacion de contexto y actualizacion de memorias vivas.
-2. **[PROTOCOLO_COORDINACION_AGENTES.md](file:///Users/ismael/Documents/Honey/docs/agents/PROTOCOLO_COORDINACION_AGENTES.md)**:
+2. **[PROTOCOLO_COORDINACION_AGENTES.md](../docs/agents/PROTOCOLO_COORDINACION_AGENTES.md)**:
    Flujo de trabajo secuencial para el traspaso de instrucciones, validaciones previas y verificaciones posteriores entre el nodo macOS y el nodo Linux.
-3. **[REGISTRO_EVIDENCIAS_Y_TELEMETRIA.md](file:///Users/ismael/Documents/Honey/docs/agents/REGISTRO_EVIDENCIAS_Y_TELEMETRIA.md)**:
+3. **[REGISTRO_EVIDENCIAS_Y_TELEMETRIA.md](../docs/agents/REGISTRO_EVIDENCIAS_Y_TELEMETRIA.md)**:
    Estandar de captura de imagenes, telemetria de glifos, suites de paridad ABI C y limpieza de evidencias obsoletas.

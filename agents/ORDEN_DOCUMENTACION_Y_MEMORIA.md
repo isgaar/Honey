@@ -68,7 +68,7 @@ Cuando una sesion de trabajo avanza o se prepara para una compactacion de contex
    - Archivos modificados y lineas clave intervenidas.
    - Comprobaciones matematicas y resultados de paridad de salida.
 2. **Preservar la memoria en el repositorio**:
-   La memoria tecnica no debe perderse en el historial volatil del chat. Debe quedar plasmada en los articulos de [docs/articles/](file:///Users/ismael/Documents/Honey/docs/articles/) y en los hitos de [docs/plan/](file:///Users/ismael/Documents/Honey/docs/plan/).
+   La memoria tecnica no debe perderse en el historial volatil del chat. Debe quedar plasmada en los articulos de [docs/articles/](../docs/articles) y en los hitos de [docs/plan/](../docs/plan).
 3. **Formato de Enlaces Clickables**:
    Toda referencia a archivos o simbolos debe formatearse con enlaces absolutos clickables mediante el esquema `file://`:
-   `[nombre_archivo.ext](file:///ruta/absoluta/al/archivo)`
+   `[nombre_archivo.ext](/ruta/absoluta/al/archivo)`

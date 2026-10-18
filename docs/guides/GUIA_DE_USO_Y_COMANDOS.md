@@ -68,4 +68,4 @@ Para verificar que la biblioteca compartida mantiene compatibilidad con la espec
 ```bash
 ./bin/honey test
 ```
-Compilara y ejecutara [examples/test_comprehensive_abi.c](file:///Users/ismael/Documents/Honey/examples/test_comprehensive_abi.c), confirmando que las 16 comprobaciones de paridad de ABI (inicializacion, descomposicion de contornos, cajas delimitadoras CBox, glifos independientes y tablas SFNT) pasen al 100%.
+Compilara y ejecutara [examples/test_comprehensive_abi.c](../../examples/test_comprehensive_abi.c), confirmando que las 16 comprobaciones de paridad de ABI (inicializacion, descomposicion de contornos, cajas delimitadoras CBox, glifos independientes y tablas SFNT) pasen al 100%.

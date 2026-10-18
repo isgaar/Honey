@@ -6,7 +6,7 @@ Este documento estandariza como deben registrarse, nombrarse, auditarse y depura
 
 ## 1. Convencion para Evidencias Graficas (`docs/issues/`)
 
-El directorio [docs/issues/](file:///Users/ismael/Documents/Honey/docs/issues) almacena exclusivamente las capturas de pantalla activas que documentan un problema tipografico en curso o la validacion final de una correccion.
+El directorio [docs/issues/](../docs/issues) almacena exclusivamente las capturas de pantalla activas que documentan un problema tipografico en curso o la validacion final de una correccion.
 
 ### 1.1 Reglas de Depuracion (Zero Bloat)
 Para evitar que el repositorio de Git crezca innecesariamente con gigabytes de binarios PNG obsoletos:
@@ -54,5 +54,5 @@ gdbus call --session \
 ## 3. Registro de Telemetria Tipografica
 
 Para validar la paridad de glifos sin depender de inspeccion visual humana, los agentes deben recurrir a programas de validacion C contra la biblioteca compilada:
-- Suite ABI global: [examples/test_comprehensive_abi.c](file:///Users/ismael/Documents/Honey/examples/test_comprehensive_abi.c)
+- Suite ABI global: [examples/test_comprehensive_abi.c](../examples/test_comprehensive_abi.c)
 - Programa de prueba de glifo individual: extraccion de `bitmap_left`, `bitmap_top`, `width`, `rows`, `horiBearingY` y comparacion contra la salida de `libfreetype.so.6` oficial.

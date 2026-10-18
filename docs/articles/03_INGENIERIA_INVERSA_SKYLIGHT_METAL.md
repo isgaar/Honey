@@ -84,7 +84,7 @@ Aplica una matriz de **Ruido Azul (Blue Noise)** espacial de alta frecuencia sob
 
 ## 4. Telemetria Empirica en Tiempo Real: Cuantificacion de Energia de Tinta
 
-Utilizando la herramienta de extraccion de matrices en memoria [quartz_pixel_inspector.swift](file:///Users/ismael/Documents/quartzFree/tools/quartz_pixel_inspector.swift), se midieron los mapas de pixeles reales del glifo `'e'` (Times New Roman, 12pt) en macOS Sequoia bajo diferentes niveles de `AppleFontSmoothing`:
+Utilizando la herramienta de extraccion de matrices en memoria [quartz_pixel_inspector.swift](tools/quartz_pixel_inspector.swift), se midieron los mapas de pixeles reales del glifo `'e'` (Times New Roman, 12pt) en macOS Sequoia bajo diferentes niveles de `AppleFontSmoothing`:
 
 ```
 ======================================================================

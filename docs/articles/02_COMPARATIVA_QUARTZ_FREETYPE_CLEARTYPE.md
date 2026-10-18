@@ -63,7 +63,7 @@ Hasta macOS High Sierra (10.13), Apple soportaba subpixel rendering cromatico. A
 En Linux, los monitores 1080p siguen representando una porcion masiva del parque de hardware. Honey resuelve la suavidad excesiva de macOS mediante una estrategia hibrida calibrada:
 
 1. **Adopta la fidelidad de contorno y la escala de grises universal de Quartz** (eliminando los flecos cromaticos y habilitando compatibilidad total con compositores Wayland).
-2. **Inyecta dilatacion optica calibrada ([crates/honey-core/src/dilation.rs](file:///Users/ismael/Documents/Honey/crates/honey-core/src/dilation.rs)):**
+2. **Inyecta dilatacion optica calibrada ([crates/honey-core/src/dilation.rs](../../crates/honey-core/src/dilation.rs)):**
    Aporta entre un **+4% y un +16% de masa de tinta** en cuerpos de lectura (8 a 14 pt), evitando que el texto se perciba borroso o desvanecido en paneles de 96-102 PPI.
 3. **Mezcla lineal fotometrica:**
    Garantiza que el contraste en Modo Oscuro permanezca nitido y solido sin requerir el falseo destructivo del bytecode hinting.

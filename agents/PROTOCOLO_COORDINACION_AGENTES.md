@@ -33,7 +33,7 @@ Antes de proporcionar un bloque de comandos para el nodo Linux, el agente en mac
 4. Realizar `git push origin main` y verificar que el arbol remoto este limpio.
 5. Formatear las instrucciones en un bloque unico de Markdown autoejecutable que:
    - Mate instancias previas antes de precargar el shim para evitar conexiones remotas al proceso viejo.
-   - Use rutas absolutas correctas (`/home/ismael/Proyectos/Honey/...`).
+   - Use rutas relativas o basadas en el directorio de trabajo (`$PWD/target/release/libhoney_shim.so`).
    - Incluya comandos de verificacion de memoria (`pmap $(pgrep ...) | grep libhoney`).
 
 ---
