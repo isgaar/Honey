@@ -36,6 +36,8 @@ Honey trabaja en modo usuario: instala el comando `honey`, gestiona el perfil op
   - `examples/test_freetype_client.c`: cliente de prueba en C que valida la sustitucion de FreeType 2 via `libhoney_shim`.
   - `examples/test_comprehensive_abi.c`: suite exhaustiva de 16 pruebas de ABI contra fuentes reales de Linux.
 - `docs/`:
+  - `docs/QUARTZFREE_RESEARCH_AND_OBJECTIVES.md`: compendio completo de investigacion QuartzFree y objetivos estrategicos de Honey.
+  - `docs/DESKTOP_PROFILES_GNOME_KDE_RESEARCH.md`: investigacion profunda de la pila tipografica en GNOME y KDE Plasma y perfiles de escritorio.
   - `docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md`: memoria tecnica de desarrollo e implementacion en Linux.
   - `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md`: memoria tecnica de investigacion en macOS Sequoia.
   - `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md`: plan maestro de reemplazo de FreeType a nivel de sistema.
@@ -127,6 +129,8 @@ sudo honey restore-system
 
 ## Documentacion Tecnica
 
+- [Compendio de Investigacion QuartzFree y Objetivos](docs/QUARTZFREE_RESEARCH_AND_OBJECTIVES.md)
+- [Investigacion de Pilas Tipograficas en GNOME y KDE Plasma](docs/DESKTOP_PROFILES_GNOME_KDE_RESEARCH.md)
 - [Memoria Tecnica Desarrollo en Linux](docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md)
 - [Memoria Tecnica macOS y Transicion a Linux](docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md)
 - [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md)
