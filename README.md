@@ -91,7 +91,6 @@ Las aplicaciones basadas en Electron / Chromium heredan automaticamente el perfi
 honey launch-electron cursor
 honey launch-code .
 honey launch-codium .
-honey launch-honey-codium .
 ```
 
 O abrelas normalmente desde tu lanzador de aplicaciones de escritorio tras ejecutar `honey apply`.

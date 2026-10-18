@@ -73,11 +73,10 @@ $HOME/.config/fontconfig/conf.d/99-honey.conf
 ```
 
 Tambien sincronizara, con respaldos, configuraciones de GTK, KDE, xsettingsd y
-Electron/Codium cuando existan. En Firefox instala `userChrome.css` para la
+Electron/Chromium cuando existan. En Firefox instala `userChrome.css` para la
 interfaz y un trazo web neutral que no cambia el diseño de las páginas. En
 KDE instala una capa de sesión para que el menú y otros lanzadores hereden
-Honey. Si detecta VSCodium, adapta de forma reversible su lanzador KDE para
-cubrir instalaciones locales que omiten el entorno de sesión.
+Honey.
 
 Despues regenera la cache si `fc-cache` esta disponible.
 
@@ -95,10 +94,10 @@ Tambien puedes ejecutar el ejemplo:
 ~/.local/share/honey/examples/check-rendering.sh
 ```
 
-Para abrir una instancia aislada de diagnóstico:
+Para abrir un editor Electron asegurando las banderas de Honey:
 
 ```bash
-honey launch-honey-codium .
+honey launch-codium .
 ```
 
 ## Retirar el perfil

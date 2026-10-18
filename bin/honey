@@ -55,14 +55,6 @@ CHROMIUM_FLAGS="$CONFIG_HOME/chromium-flags.conf"
 BRAVE_FLAGS="$CONFIG_HOME/brave-flags.conf"
 
 LOCAL_APPLICATIONS_DIR="$DATA_HOME/applications"
-CODIUM_DESKTOP_SOURCE="/usr/share/applications/codium.desktop"
-CODIUM_URL_DESKTOP_SOURCE="/usr/share/applications/codium-url-handler.desktop"
-CODIUM_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium.desktop"
-CODIUM_URL_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-url-handler.desktop"
-CODIUM_HONEY_DESKTOP_TARGET="$LOCAL_APPLICATIONS_DIR/codium-honey.desktop"
-CODIUM_HONEY_USER_DATA_DIR="$CONFIG_HOME/VSCodium-Honey"
-CODIUM_HONEY_EXTENSIONS_DIR="$DATA_HOME/honey/codium/extensions"
-CODIUM_WRAPPER="/usr/bin/codium"
 HONEY_ELECTRON_FLAGS=(--disable-lcd-text --font-render-hinting=none --enable-font-antialiasing --force-color-profile=srgb)
 
 green='\033[0;32m'
@@ -85,7 +77,6 @@ Uso:
   honey launch-codium [RUTA] Abre Codium con el render macOS de Honey
   honey launch-code [RUTA] Abre VS Code con el render macOS de Honey
   honey launch-cursor [RUTA] Abre Cursor con el render macOS de Honey
-  honey launch-honey-codium [RUTA] Abre una instancia aislada para diagnostico
   honey status       Muestra estado y muestras de fontconfig
   honey doctor       Revisa dependencias y rutas
   honey paths        Muestra rutas usadas
@@ -97,7 +88,7 @@ Honey no necesita sudo. Sus cambios viven en:
 
 Tambien sincroniza, con respaldo, estas capas cuando existen:
   GTK 3/4, xsettingsd, KDE/kdeglobals y entorno de sesion KDE/DBus.
-  Electron: flags globales e individuales (~/.config/*-flags.conf) y lanzadores.
+  Electron: flags globales e individuales (~/.config/*-flags.conf).
   Firefox recibe una hoja userChrome.css solo para su interfaz.
 EOF
 }
@@ -124,9 +115,6 @@ print_paths() {
     printf 'FIREFOX_CHROME_CSS_SOURCE=%s\n' "$FIREFOX_CHROME_CSS_SOURCE"
     printf 'FIREFOX_WEB_CSS_SOURCE=%s\n' "$FIREFOX_WEB_CSS_SOURCE"
     printf 'CODIUM_FLAGS=%s\n' "$CODIUM_FLAGS"
-    printf 'CODIUM_DESKTOP_TARGET=%s\n' "$CODIUM_DESKTOP_TARGET"
-    printf 'CODIUM_HONEY_DESKTOP_TARGET=%s\n' "$CODIUM_HONEY_DESKTOP_TARGET"
-    printf 'CODIUM_HONEY_USER_DATA_DIR=%s\n' "$CODIUM_HONEY_USER_DATA_DIR"
 }
 
 is_managed_profile() {
@@ -724,84 +712,6 @@ reset_electron_flags() {
     done < <(electron_flags_files)
 }
 
-patch_codium_desktop_file() {
-    local source="$1" target="$2" label="$3"
-    local tmp honey_cli
-
-    [[ -f "$source" ]] || return 0
-
-    mkdir -p "$LOCAL_APPLICATIONS_DIR" "$STATE_DIR"
-    remember_original "$target" "$label"
-    tmp="$(mktemp "$STATE_DIR/honey-desktop.XXXXXX")"
-    honey_cli="$ROOT_DIR/bin/honey"
-
-    awk -v honey_cli="$honey_cli" '
-        BEGIN {
-            print "# Managed by Honey"
-        }
-        /^#[[:space:]]*Managed by Honey[[:space:]]*$/ {
-            next
-        }
-        /^Exec=/ {
-            command_line = substr($0, 6)
-            sub(/^[[:space:]]*/, "", command_line)
-
-            if (substr(command_line, 1, 1) == "\"") {
-                command_line = substr(command_line, 2)
-                closing_quote = index(command_line, "\"")
-                if (closing_quote > 0) {
-                    command_line = substr(command_line, closing_quote + 1)
-                } else {
-                    command_line = ""
-                }
-            } else {
-                sub(/^[^[:space:]]+/, "", command_line)
-            }
-
-            sub(/^[[:space:]]*/, "", command_line)
-            printf "Exec=\"%s\" launch-codium", honey_cli
-            if (command_line != "") {
-                printf " %s", command_line
-            }
-            if (command_line !~ /%[fFuU]/) {
-                printf " %%F"
-            }
-            printf "\n"
-            next
-        }
-        { print }
-    ' "$source" > "$tmp"
-
-    mv -f "$tmp" "$target"
-}
-
-write_codium_honey_desktop_file() {
-    mkdir -p "$LOCAL_APPLICATIONS_DIR" "$CODIUM_HONEY_USER_DATA_DIR" "$CODIUM_HONEY_EXTENSIONS_DIR"
-    remember_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
-
-    cat > "$CODIUM_HONEY_DESKTOP_TARGET" <<EOF
-[Desktop Entry]
-Name=VSCodium Honey
-Comment=VSCodium isolated Honey render instance
-GenericName=Text Editor
-Exec="$ROOT_DIR/bin/honey" launch-honey-codium %F
-Icon=vscodium
-Type=Application
-StartupNotify=false
-StartupWMClass=VSCodium
-Categories=TextEditor;Development;IDE;
-MimeType=text/plain;inode/directory;application/x-codium-workspace;
-Actions=new-empty-window;
-Keywords=honey;vscodium;codium;vscode;
-
-[Desktop Action new-empty-window]
-Name=New Honey Window
-Name[es]=Nueva ventana Honey
-Exec="$ROOT_DIR/bin/honey" launch-honey-codium --new-window %F
-Icon=vscodium
-EOF
-}
-
 refresh_desktop_launchers() {
     if command_exists update-desktop-database; then
         update-desktop-database "$LOCAL_APPLICATIONS_DIR" >/dev/null 2>&1 || true
@@ -814,22 +724,35 @@ refresh_desktop_launchers() {
     fi
 }
 
-apply_codium_launchers() {
-    local desktop_source="$CODIUM_DESKTOP_SOURCE"
-    local url_desktop_source="$CODIUM_URL_DESKTOP_SOURCE"
+cleanup_legacy_codium_launchers() {
+    local changed=0
+    local codium_desktop="$LOCAL_APPLICATIONS_DIR/codium.desktop"
+    local codium_url_desktop="$LOCAL_APPLICATIONS_DIR/codium-url-handler.desktop"
+    local codium_honey_desktop="$LOCAL_APPLICATIONS_DIR/codium-honey.desktop"
 
-    if [[ -f "$CODIUM_DESKTOP_TARGET" ]]; then
-        desktop_source="$CODIUM_DESKTOP_TARGET"
+    if [[ -f "$codium_honey_desktop" ]]; then
+        rm -f "$codium_honey_desktop"
+        changed=1
     fi
 
-    if [[ -f "$CODIUM_URL_DESKTOP_TARGET" ]]; then
-        url_desktop_source="$CODIUM_URL_DESKTOP_TARGET"
+    if [[ -f "$codium_desktop" ]] && grep -q "$MARKER" "$codium_desktop"; then
+        restore_original "$codium_desktop" "codium.desktop"
+        rm -f "$ORIGINAL_DIR/codium.desktop" "$ORIGINAL_DIR/codium.desktop.missing"
+        changed=1
     fi
 
-    patch_codium_desktop_file "$desktop_source" "$CODIUM_DESKTOP_TARGET" "codium.desktop"
-    patch_codium_desktop_file "$url_desktop_source" "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
-    write_codium_honey_desktop_file
-    refresh_desktop_launchers
+    if [[ -f "$codium_url_desktop" ]] && grep -q "$MARKER" "$codium_url_desktop"; then
+        restore_original "$codium_url_desktop" "codium-url-handler.desktop"
+        rm -f "$ORIGINAL_DIR/codium-url-handler.desktop" "$ORIGINAL_DIR/codium-url-handler.desktop.missing"
+        changed=1
+    fi
+
+    rm -f "$ORIGINAL_DIR/codium-honey.desktop" "$ORIGINAL_DIR/codium-honey.desktop.missing"
+
+    if (( changed )); then
+        refresh_desktop_launchers
+        ok "Lanzadores legacy de Codium limpiados y restaurados"
+    fi
 }
 
 apply_flatpak_config() {
@@ -860,9 +783,7 @@ apply_compatibility() {
     apply_kde_session_environment
     apply_electron_flags
     apply_flatpak_config
-    if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
-        apply_codium_launchers
-    fi
+    cleanup_legacy_codium_launchers
     ok "Compatibilidad GTK/KDE/Electron/Flatpak aplicada desde la sesion"
 }
 
@@ -876,9 +797,7 @@ reset_compatibility() {
     reset_firefox_chrome_config
     reset_electron_flags
     reset_flatpak_config
-    restore_original "$CODIUM_DESKTOP_TARGET" "codium.desktop"
-    restore_original "$CODIUM_URL_DESKTOP_TARGET" "codium-url-handler.desktop"
-    restore_original "$CODIUM_HONEY_DESKTOP_TARGET" "codium-honey.desktop"
+    cleanup_legacy_codium_launchers
     reset_running_session_environment
     refresh_desktop_launchers
 }
@@ -1024,8 +943,7 @@ status() {
     printf 'KDE font -> %s\n' "$(print_ini_value "$KDE_GLOBALS" "General" "font")"
     printf 'Firefox chrome -> %s\n' "$(firefox_chrome_state)"
     printf 'Firefox web render -> %s\n' "$(firefox_web_state)"
-    printf 'Legacy Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
-    printf 'Codium desktop -> %s\n' "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")"
+    printf 'Codium flags -> %s\n' "$(print_flag_value "$CODIUM_FLAGS" "--font-render-hinting=")"
 }
 
 doctor() {
@@ -1041,16 +959,7 @@ doctor() {
     if [[ -d "$FIREFOX_CONFIG_DIR" ]]; then ok "perfiles de Firefox encontrados"; else warn "perfiles de Firefox no encontrados"; fi
     if [[ -e "$GTK3_SETTINGS" ]]; then ok "GTK3 settings encontrado"; else warn "GTK3 settings no encontrado"; fi
     if [[ -e "$GTK4_SETTINGS" ]]; then ok "GTK4 settings encontrado"; else warn "GTK4 settings no encontrado"; fi
-    if command_exists codium || command_exists vscodium || [[ -x "$CODIUM_WRAPPER" ]]; then
-        ok "VSCodium encontrado"
-    else
-        warn "VSCodium no encontrado; se omite su lanzador especializado"
-    fi
-    if [[ "$(print_managed_file_state "$CODIUM_DESKTOP_TARGET")" == "active" ]]; then
-        ok "launcher KDE de VSCodium gestionado por Honey"
-    else
-        warn "launcher KDE de VSCodium no gestionado por Honey"
-    fi
+    if command_exists codium || command_exists vscodium; then ok "VSCodium encontrado"; fi
     if [[ -f "$HONEY_ENVIRONMENT_TARGET" ]]; then ok "environment.d Honey encontrado"; else warn "environment.d Honey no encontrado"; fi
     if [[ -f "$HONEY_PLASMA_ENV_TARGET" ]]; then ok "hook Plasma Honey encontrado"; else warn "hook Plasma Honey no encontrado"; fi
     if [[ -d "$(dirname "$PROFILE_TARGET")" || -w "${XDG_CONFIG_HOME:-$HOME/.config}" ]]; then
@@ -1075,8 +984,8 @@ resolve_codium_bin() {
         bin="$(command -v codium)"
     elif command_exists vscodium; then
         bin="$(command -v vscodium)"
-    elif [[ -x "$CODIUM_WRAPPER" ]]; then
-        bin="$CODIUM_WRAPPER"
+    elif [[ -x "/usr/bin/codium" ]]; then
+        bin="/usr/bin/codium"
     fi
 
     [[ -n "$bin" ]] || return 1
@@ -1137,21 +1046,6 @@ launch_codium() {
     "$bin" "${HONEY_ELECTRON_FLAGS[@]}" "$@"
 }
 
-launch_honey_codium() {
-    local bin
-
-    bin="$(resolve_codium_bin || true)"
-    [[ -n "$bin" ]] || die "No encontre codium"
-    mkdir -p "$CODIUM_HONEY_USER_DATA_DIR" "$CODIUM_HONEY_EXTENSIONS_DIR"
-
-    prepare_launch_environment
-    "$bin" \
-        --user-data-dir "$CODIUM_HONEY_USER_DATA_DIR" \
-        --extensions-dir "$CODIUM_HONEY_EXTENSIONS_DIR" \
-        "${HONEY_ELECTRON_FLAGS[@]}" \
-        "$@"
-}
-
 main() {
     local command_name="${1:-help}"
     shift || true
@@ -1163,7 +1057,6 @@ main() {
         launch-code) launch_code "$@" ;;
         launch-cursor) launch_cursor "$@" ;;
         launch-codium) launch_codium "$@" ;;
-        launch-honey-codium) launch_honey_codium "$@" ;;
         status) status ;;
         doctor) doctor ;;
         paths) print_paths ;;

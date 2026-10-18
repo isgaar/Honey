@@ -12,6 +12,7 @@
 - Documento de memoria tecnica: `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md` con la bitacora de investigacion y guia paso a paso para continuar el desarrollo en Linux.
 - Documento maestro de arquitectura: `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md` para sustituir a FreeType directamente en el sistema operativo sin intermediarios ni parches.
 - Incorporacion de documentacion tecnica profunda: `QUARTZ_1_TO_1_PARITY.md`, `MATHEMATICAL_MODEL.md` y `NATIVE_ENGINE_SPECIFICATION.md`.
+- Eliminacion de la intervencion invasiva de lanzadores de escritorio para VSCodium: se retiran el parcheo de `codium.desktop`, el lanzador secundario `codium-honey.desktop` y la generacion forzada de perfiles aislados en `~/.config/VSCodium-Honey`, respetando plenamente la configuracion nativa del usuario y sus extensiones.
 - Implementacion complementaria en C (`native/libhoney_quartz.c`).
 
 ## 0.6.0

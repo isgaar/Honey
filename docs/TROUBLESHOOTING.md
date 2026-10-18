@@ -104,11 +104,10 @@ KDE environment.d -> active
 Plasma env hook -> active
 ```
 
-Para evitar que Codium reutilice una ventana vieja, prueba una instancia
-aislada de diagnóstico:
+Para lanzar Codium asegurando las variables de renderizado de Honey:
 
 ```bash
-honey launch-honey-codium .
+honey launch-codium .
 ```
 
 Cierra todas las ventanas de VSCodium antes de comparar. Si solo recargas la

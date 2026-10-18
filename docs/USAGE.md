@@ -28,7 +28,7 @@ Este comando:
 - alinea GTK 3, GTK 4, xsettingsd y KDE;
 - instala una capa de sesión para KDE con `environment.d` y `plasma-workspace/env`;
 - importa el entorno Honey a systemd user y DBus cuando la sesión lo permite;
-- adapta con respaldo el lanzador KDE de VSCodium cuando existe;
+- alinea flags de aplicaciones Electron (~/.config/*-flags.conf) para VS Code, Codium, Cursor y afines;
 - habilita `userChrome.css` para la interfaz y un trazo web neutral sin alterar diseños;
 - regenera cache con `fc-cache` cuando esta disponible.
 
@@ -50,22 +50,15 @@ Honey escribe esas variables en:
 ~/.config/plasma-workspace/env/90-honey.sh
 ```
 
-Algunas instalaciones locales de VSCodium usan un lanzador que no conserva ese
-entorno. Honey crea un override KDE gestionado y guarda el original antes de
-redirigirlo por `honey launch-codium`.
+## Lanzadores CLI para Electron
 
-## Diagnóstico con VSCodium
+Para abrir editores o aplicaciones Electron garantizando el entorno y banderas de renderizado de macOS:
 
 ```bash
-honey launch-honey-codium .
-```
-
-Ese comando abre una instancia aislada para comparar render y confirmar que
-Honey funciona sin depender de una ventana vieja.
-
-```bash
-~/.config/VSCodium-Honey
-~/.local/share/honey/codium/extensions
+honey launch-codium [RUTA]
+honey launch-code [RUTA]
+honey launch-cursor [RUTA]
+honey launch-electron COMANDO [ARGS]
 ```
 
 ## Ver estado
@@ -80,7 +73,7 @@ Muestra:
 - donde esta el archivo fuente;
 - donde esta el archivo aplicado;
 - que fuentes resuelve `fontconfig` para familias comunes;
-- que hinting estan usando GTK, KDE y Codium;
+- que hinting estan usando GTK, KDE y flags de Electron;
 - que perfiles de Firefox tienen activos los renders de interfaz y web neutral.
 - si `environment.d` y el hook de Plasma estan activos.
 
@@ -120,7 +113,7 @@ Sirve para revisar:
 - `fc-cache`;
 - `fc-match`;
 - perfil fuente;
-- configuraciones GTK/KDE/Codium;
+- configuraciones GTK/KDE/Electron;
 - rutas de configuracion.
 
 ## Rutas
