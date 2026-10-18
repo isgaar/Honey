@@ -36,20 +36,12 @@ Honey trabaja en modo usuario: instala el comando `honey`, gestiona el perfil op
   - `examples/test_freetype_client.c`: cliente de prueba en C que valida la sustitucion de FreeType 2 via `libhoney_shim`.
   - `examples/test_comprehensive_abi.c`: suite exhaustiva de 16 pruebas de ABI contra fuentes reales de Linux.
 - `docs/`:
-  - `docs/QUARTZFREE_RESEARCH_AND_OBJECTIVES.md`: compendio completo de investigacion QuartzFree y objetivos estrategicos de Honey.
-  - `docs/DESKTOP_PROFILES_GNOME_KDE_RESEARCH.md`: investigacion profunda de la pila tipografica en GNOME y KDE Plasma y perfiles de escritorio.
-  - `docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md`: memoria tecnica de desarrollo e implementacion en Linux.
-  - `docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md`: memoria tecnica de investigacion en macOS Sequoia.
-  - `docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md`: plan maestro de reemplazo de FreeType a nivel de sistema.
-  - `docs/QUARTZ_1_TO_1_PARITY.md`: analisis de ingenieria, telemetria empirica y paridad 1:1.
-  - `docs/MATHEMATICAL_MODEL.md`: formulacion fotometrica, ecuaciones y curvas de dilatacion.
-  - `docs/NATIVE_ENGINE_SPECIFICATION.md`: integracion nativa en compositores Wayland, Cairo y Skia.
-  - `docs/RENDERING.md`: modelo y decisiones de rasterizacion.
-  - `docs/INSTALL.md`: guia de instalacion paso a paso.
-  - `docs/USAGE.md`: manual completo de comandos y lanzadores.
-  - `docs/TROUBLESHOOTING.md`: solucion de problemas comunes.
-  - `docs/DEVELOPMENT.md`: guia para desarrolladores.
-  - `docs/GITHUB.md`: publicacion y sincronizacion.
+  - `docs/README.md`: indice maestro y mapa de la biblioteca documental.
+  - `docs/articles/`: articulos y papers de investigacion cientifica (Fundamentos, Comparativas, Shaders, GNOME/KDE, Rust Core).
+  - `docs/plan/`: planes maestros, roadmap y metodologia clean-room.
+  - `docs/agents/`: protocolos de gobernanza, orden de documentacion y coordinacion multi-agente.
+  - `docs/guides/`: guias operativas de instalacion, comandos del CLI y diagnostico.
+  - `docs/issues/`: evidencias visuales y capturas de pantalla activas.
 
 ---
 
@@ -127,17 +119,24 @@ sudo honey restore-system
 
 ---
 
-## Documentacion Tecnica
+## Documentacion Tecnica e Investigacion
+Consulte el indice maestro en [docs/README.md](docs/README.md) para el acceso completo a la biblioteca tecnica:
 
-- [Compendio de Investigacion QuartzFree y Objetivos](docs/QUARTZFREE_RESEARCH_AND_OBJECTIVES.md)
-- [Investigacion de Pilas Tipograficas en GNOME y KDE Plasma](docs/DESKTOP_PROFILES_GNOME_KDE_RESEARCH.md)
-- [Memoria Tecnica Desarrollo en Linux](docs/MEMORIA_TECNICA_DESARROLLO_LINUX.md)
-- [Memoria Tecnica macOS y Transicion a Linux](docs/MEMORIA_TECNICA_DESARROLLO_MACOS.md)
-- [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/PLAN_REEMPLAZO_NATIVO_FREETYPE_RUST.md)
-- [Paridad 1:1 con Quartz](docs/QUARTZ_1_TO_1_PARITY.md)
-- [Modelo Matematico y Fotometria](docs/MATHEMATICAL_MODEL.md)
-- [Especificacion del Motor Nativo](docs/NATIVE_ENGINE_SPECIFICATION.md)
-- [Modelo de Render](docs/RENDERING.md)
-- [Uso y Comandos](docs/USAGE.md)
-- [Instalacion](docs/INSTALL.md)
-- [Solucion de Problemas](docs/TROUBLESHOOTING.md)
+- **Articulos de Investigacion (Papers):**
+  - [Articulo I: Fundamentos Fisicos, Geometricos y Matematicos de Quartz](docs/articles/01_FUNDAMENTOS_QUARTZ_MATEMATICA.md)
+  - [Articulo II: Comparativa: Apple Quartz vs. Microsoft ClearType vs. GNU/Linux FreeType](docs/articles/02_COMPARATIVA_QUARTZ_FREETYPE_CLEARTYPE.md)
+  - [Articulo III: Ingenieria Inversa sobre SkyLight, Metal 3 y Shaders de WindowServer](docs/articles/03_INGENIERIA_INVERSA_SKYLIGHT_METAL.md)
+  - [Articulo IV: Toolkits Multiproceso, Electron, Skia e Integracion en Wayland](docs/articles/04_TOOLKITS_ELECTRON_COMPOSITORES.md)
+  - [Articulo V: Analisis de Pilas Tipograficas en GNOME y KDE Plasma y Perfiles Honey](docs/articles/05_PILAS_TIPOGRAFICAS_GNOME_KDE.md)
+  - [Articulo VI: Arquitectura e Implementacion del Motor Honey en Rust](docs/articles/06_ARQUITECTURA_MOTOR_HONEY_RUST.md)
+- **Planes y Metodologia:**
+  - [Plan Maestro: Reemplazo Nativo de FreeType con Rust](docs/plan/PLAN_REEMPLAZO_NATIVO_FREETYPE.md)
+  - [Roadmap Tecnico de Hitos y Fases M1-M8](docs/plan/ROADMAP_HITOS_Y_FASES.md)
+  - [Guia de Implementacion Clean-Room](docs/plan/GUIA_IMPLEMENTACION_CLEAN_ROOM.md)
+- **Gobernanza y Memoria de Agentes:**
+  - [Directorio de Agentes y Memoria](docs/agents/README.md)
+  - [Orden de Documentacion y Convenciones](docs/agents/ORDEN_DOCUMENTACION_Y_MEMORIA.md)
+- **Guias de Usuario:**
+  - [Guia de Instalacion y Despliegue en el Sistema](docs/guides/INSTALACION_Y_DESPLIEGUE.md)
+  - [Manual de Comandos y Activacion de Perfiles](docs/guides/GUIA_DE_USO_Y_COMANDOS.md)
+  - [Diagnostico y Resolucion de Problemas (Troubleshooting)](docs/guides/DIAGNOSTICO_Y_RESOLUCION_PROBLEMAS.md)
