@@ -1104,6 +1104,13 @@ install_system() {
         cp -f "$shim_src" "$honey_target"
         chmod 755 "$honey_target"
 
+        if command -v restorecon >/dev/null 2>&1; then
+            restorecon -F "$honey_target" 2>/dev/null || true
+        fi
+        if command -v chcon >/dev/null 2>&1; then
+            chcon -t lib_t "$honey_target" 2>/dev/null || true
+        fi
+
         if [[ ! -e "$deb_divert" && -e "$deb_lib" ]]; then
             dpkg-divert --package honey-freetype --add --rename --divert "$deb_divert" "$deb_lib"
         fi
@@ -1119,14 +1126,27 @@ install_system() {
         ln -sf libhoney_shim.so "$dest_dir/libfreetype.so.6"
         chmod 755 "$dest_dir/libhoney_shim.so"
 
+        # Compatibilidad con SELinux en Fedora/RHEL/CentOS
+        if command -v restorecon >/dev/null 2>&1; then
+            restorecon -F "$dest_dir/libhoney_shim.so" "$dest_dir/libfreetype.so.6" 2>/dev/null || true
+        fi
+        if command -v chcon >/dev/null 2>&1; then
+            chcon -t lib_t "$dest_dir/libhoney_shim.so" 2>/dev/null || true
+        fi
+
         local conf_file="/etc/ld.so.conf.d/00-honey.conf"
         printf '%s\n' "$dest_dir" > "$conf_file"
         chmod 644 "$conf_file"
 
+        if command -v restorecon >/dev/null 2>&1; then
+            restorecon -F "$conf_file" 2>/dev/null || true
+        fi
+
         ldconfig
 
+        # Smoke test inmediato de proteccion del sistema
         local test_bin=""
-        for b in /usr/bin/fc-match /usr/bin/alacritty /usr/bin/codium; do
+        for b in /usr/bin/fc-match /usr/bin/fc-list /usr/bin/alacritty /usr/bin/codium; do
             if [[ -x "$b" ]]; then test_bin="$b"; break; fi
         done
 
@@ -1135,17 +1155,15 @@ install_system() {
             resolved="$(ldd "$test_bin" 2>/dev/null | grep libfreetype.so.6 || true)"
             ok "Prueba de enlace superada para $test_bin: $resolved"
 
-            if [[ "$test_bin" == *"fc-match"* ]]; then
-                local exec_test
-                if ! exec_test="$("$test_bin" "sans-serif" 2>&1)"; then
-                    warn "La prueba de ejecucion con $test_bin fallo: $exec_test"
-                    warn "Revirtiendo de inmediato el reemplazo para proteger el entorno grafico..."
-                    rm -f "$conf_file" "$dest_dir/libhoney_shim.so" "$dest_dir/libfreetype.so.6"
-                    ldconfig
-                    die "Instalacion cancelada por seguridad. Se restauro FreeType oficial."
-                fi
-                ok "Prueba de ejecucion en vivo superada: $exec_test"
+            local exec_test
+            if ! exec_test="$(fc-match "sans-serif" 2>&1)" || ! fc-list : file 2>&1 | head -n 3 >/dev/null; then
+                warn "La prueba de ejecucion con fontconfig fallo: $exec_test"
+                warn "Revirtiendo de inmediato el reemplazo para proteger el entorno grafico..."
+                rm -f "$conf_file" "$dest_dir/libhoney_shim.so" "$dest_dir/libfreetype.so.6"
+                ldconfig
+                die "Instalacion cancelada por seguridad. Se restauro FreeType oficial."
             fi
+            ok "Prueba de ejecucion en vivo superada: $exec_test"
         fi
         ok "Honey Rust Core instalado a nivel de sistema en $dest_dir/libfreetype.so.6"
     fi

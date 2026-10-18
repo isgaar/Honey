@@ -36,6 +36,9 @@ echo "%{_libdir}/honey" > %{buildroot}%{_sysconfdir}/ld.so.conf.d/00-honey.conf
 
 %post
 /sbin/ldconfig
+if [ -x /usr/sbin/restorecon ]; then
+    /usr/sbin/restorecon -F %{_libdir}/honey/libfreetype.so.6 %{_sysconfdir}/ld.so.conf.d/00-honey.conf 2>/dev/null || :
+fi
 
 %postun
 /sbin/ldconfig
